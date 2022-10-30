@@ -1,7 +1,14 @@
 use crate::ast::*;
 use crate::lexer::Token;
 use logos::{Lexer, Logos};
+use std::ops::Range;
 use thiserror::Error;
+
+#[derive(Debug, PartialEq)]
+pub struct Position {
+    line: usize,
+    range: Range<usize>,
+}
 
 #[derive(Debug, Error, PartialEq)]
 pub enum ParserError {
@@ -15,6 +22,7 @@ pub struct Parser<'a> {
     errors: Vec<ParserError>,
 
     current_token: Token,
+    current_span: Range<usize>,
     peek_token: Token,
 
     line: usize,
@@ -27,6 +35,7 @@ impl<'a> Parser<'a> {
             lexer,
             errors: Vec::new(),
             current_token: Token::EOF,
+            current_span: 0..0,
             peek_token: Token::EOF,
             line: 1,
         };
@@ -52,18 +61,39 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn line(&self) -> usize {
-        self.line
+    pub fn position(&self) -> Position {
+        let mut lineno = 1;
+        let mut char_index = 0;
+        let start = self.current_span.start;
+        let column = self
+            .lexer
+            .source()
+            .split('\n')
+            .find_map(|line| {
+                let mut col = 0;
+                for _ in 0..line.len() {
+                    if char_index == start {
+                        return Some(col);
+                    }
+                    col += 1;
+                    char_index += 1;
+                }
+
+                lineno += 1;
+                char_index += 1;
+                None
+            })
+            .expect("Current char should be in source");
+        Position {
+            line: lineno,
+            range: column..column + self.current_span.len(),
+        }
     }
 
     fn next_token(&mut self) {
         self.current_token = self.peek_token.clone();
+        self.current_span = self.lexer.span();
         self.peek_token = self.lexer.next().unwrap_or(Token::EOF);
-        if self.current_token == Token::Newline {
-            self.line += 1;
-            // Get rid of newline
-            self.next_token();
-        }
     }
 
     fn parse_stmt(&mut self) -> Option<Stmt> {
@@ -156,34 +186,48 @@ mod tests {
     fn tracks_first_line() {
         let input = "123 456";
         let parser = Parser::new(input);
-        assert_eq!(1, parser.line());
+        assert_eq!(
+            Position {
+                line: 1,
+                range: 0..3,
+            },
+            parser.position()
+        );
     }
 
     #[test]
-    fn tracks_line_numbers() {
+    fn tracks_position_horizontally() {
+        let input = "123 456";
+        let mut parser = Parser::new(input);
+        parser.next_token();
+        assert_eq!(
+            Position {
+                line: 1,
+                range: 4..7,
+            },
+            parser.position()
+        );
+    }
+
+    #[test]
+    fn tracks_position_vertically() {
         let input = "123
-        456";
+
+
+
+456";
         let mut parser = Parser::new(input);
 
         assert_eq!(Token::Integer(123), parser.current_token);
         parser.next_token();
         assert_eq!(Token::Integer(456), parser.current_token);
-        assert_eq!(2, parser.line())
-    }
-
-    #[test]
-    fn tracks_line_numbers_with_multiple_newlines() {
-        let input = "123
-
-
-
-        456";
-        let mut parser = Parser::new(input);
-
-        assert_eq!(Token::Integer(123), parser.current_token);
-        parser.next_token();
-        assert_eq!(Token::Integer(456), parser.current_token);
-        assert_eq!(5, parser.line())
+        assert_eq!(
+            Position {
+                line: 5,
+                range: 0..3,
+            },
+            parser.position()
+        )
     }
 
     #[test]
