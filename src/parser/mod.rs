@@ -68,7 +68,9 @@ impl<'a> Parser<'a> {
 
     fn parse_stmt(&mut self) -> Option<Stmt> {
         let stmt = match self.current_token {
-            Token::Let => Stmt::Let(self.parse_let_stmt()?),
+            Token::Ident(_) if self.peek_token == Token::Assign => {
+                Stmt::Assign(self.parse_assign_stmt()?)
+            }
             Token::Return => Stmt::Return(self.parse_return_stmt()?),
             Token::If => self.parse_if_stmt(),
             _ => Stmt::Expr(self.parse_expr_stmt()?),
@@ -101,8 +103,8 @@ impl<'a> Parser<'a> {
         Some(ReturnStmt { value: Expr::Blank })
     }
 
-    fn parse_let_stmt(&mut self) -> Option<LetStmt> {
-        let ident = if let Token::Ident(ident) = &self.peek_token {
+    fn parse_assign_stmt(&mut self) -> Option<AssignStmt> {
+        let ident = if let Token::Ident(ident) = &self.current_token {
             Ident(ident.to_owned())
         } else {
             self.errors.push(ParserError::ExpectedToken {
@@ -111,12 +113,11 @@ impl<'a> Parser<'a> {
             });
             return None;
         };
-        self.next_token();
         self.expect_peek(Token::Assign)?;
         while self.current_token != Token::Semicolon {
             self.next_token();
         }
-        Some(LetStmt {
+        Some(AssignStmt {
             name: ident,
             value: Expr::Blank,
         })
@@ -187,24 +188,13 @@ mod tests {
 
     #[test]
     fn parse_let_stmt() {
-        let inputs = ["let x = 3;"];
-        let expecteds = [Stmt::Let(LetStmt {
+        let inputs = ["x = 3;"];
+        let expecteds = [Stmt::Assign(AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Blank,
         })];
 
         test_parse!(inputs, expecteds)
-    }
-
-    #[test]
-    fn parse_let_stmt_errors_with_no_ident() {
-        let inputs = ["let x 3;"];
-        let expecteds = [ParserError::ExpectedToken {
-            line: 1,
-            token: Token::Assign,
-        }];
-
-        test_parse_errs!(inputs, expecteds)
     }
 
     #[test]

@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
     Blank,
-    Let(LetStmt),
+    Assign(AssignStmt),
     Return(ReturnStmt),
     Expr(Expr),
 }
@@ -13,7 +13,7 @@ pub enum Expr {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct LetStmt {
+pub struct AssignStmt {
     pub name: Ident,
     pub value: Expr,
 }

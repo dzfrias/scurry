@@ -63,8 +63,6 @@ pub enum Token {
 
     #[token("fn")]
     Function,
-    #[token("let")]
-    Let,
     #[token("True")]
     True,
     #[token("False")]
@@ -292,12 +290,6 @@ mod tests {
     fn tokenizes_fn() {
         let mut lexer = Token::lexer("fn");
         assert_eq!(Token::Function, lexer.next().expect("Should lex something"))
-    }
-
-    #[test]
-    fn tokenizes_let() {
-        let mut lexer = Token::lexer("let");
-        assert_eq!(Token::Let, lexer.next().expect("Should lex something"))
     }
 
     #[test]
