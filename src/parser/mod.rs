@@ -13,11 +13,15 @@ pub struct Position {
 
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "line: {}, range: <{}, {}>",
-            self.line, self.range.start, self.range.end
-        )
+        if self.range.len() == 1 {
+            write!(f, "line: {}, column: {}", self.line, self.range.end)
+        } else {
+            write!(
+                f,
+                "line: {}, range: <{}, {}>",
+                self.line, self.range.start, self.range.end
+            )
+        }
     }
 }
 
@@ -25,6 +29,12 @@ impl fmt::Display for Position {
 pub enum ParserError {
     #[error("expected `{:?}` on {pos}", token)]
     ExpectedToken { pos: Position, token: Token },
+
+    #[error("unteriminated string on {pos}")]
+    UnteriminatedString { pos: Position },
+
+    #[error("illegal character on {pos}")]
+    IllegalCharacter { pos: Position },
 }
 
 #[derive(Debug)]
@@ -76,7 +86,7 @@ impl<'a> Parser<'a> {
         let column = self
             .lexer
             .source()
-            .split('\n')
+            .lines()
             .find_map(|line| {
                 let mut col = 0;
                 for _ in 0..line.len() {
@@ -111,6 +121,21 @@ impl<'a> Parser<'a> {
             }
             Token::Return => Stmt::Return(self.parse_return_stmt()?),
             Token::If => self.parse_if_stmt(),
+
+            Token::Error => {
+                self.errors.push(ParserError::IllegalCharacter {
+                    pos: self.position(),
+                });
+                return None;
+            }
+            Token::ErrorUnterminatedString => {
+                self.errors.push(ParserError::UnteriminatedString {
+                    pos: self.position(),
+                });
+                return None;
+            }
+
+            // Expression on one line
             _ => Stmt::Expr(self.parse_expr_stmt()?),
         };
         Some(stmt)
@@ -135,7 +160,7 @@ impl<'a> Parser<'a> {
 
     fn parse_return_stmt(&mut self) -> Option<ReturnStmt> {
         self.next_token();
-        while self.current_token != Token::Semicolon {
+        while self.current_token != Token::Semicolon && self.current_token != Token::EOF {
             self.next_token();
         }
         Some(ReturnStmt { value: Expr::Blank })
@@ -152,7 +177,7 @@ impl<'a> Parser<'a> {
             return None;
         };
         self.expect_peek(Token::Assign)?;
-        while self.current_token != Token::Semicolon {
+        while self.current_token != Token::Semicolon && self.current_token != Token::EOF {
             self.next_token();
         }
         Some(AssignStmt {

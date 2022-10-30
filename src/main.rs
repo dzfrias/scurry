@@ -1,11 +1,10 @@
-use clap::Parser;
-use logos::Logos;
+use clap::Parser as ArgParser;
 use rustyline::error::ReadlineError;
 use rustyline::{Config, Editor, Result};
-use scurry::lexer::Token;
+use scurry::parser::Parser;
 use std::process;
 
-#[derive(Debug, Parser)]
+#[derive(Debug, ArgParser)]
 #[command(author, version, about, long_about = None)]
 struct Args {}
 
@@ -24,9 +23,18 @@ fn start_repl() -> Result<()> {
             Ok(line) => {
                 editor.add_history_entry(line.as_str());
 
-                let mut lexer = Token::lexer(&line);
-                while let Some(token) = lexer.next() {
-                    println!("Token::{:?}", token);
+                let parser = Parser::new(&line);
+                match parser.parse() {
+                    Ok(program) => {
+                        for stmt in program.0 {
+                            println!("{:?}", stmt);
+                        }
+                    }
+                    Err(errs) => {
+                        for err in errs {
+                            println!("{err}");
+                        }
+                    }
                 }
                 println!();
             }
