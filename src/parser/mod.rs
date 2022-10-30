@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::lexer::Token;
 use logos::{Lexer, Logos};
+use std::fmt;
 use std::ops::Range;
 use thiserror::Error;
 
@@ -10,10 +11,20 @@ pub struct Position {
     range: Range<usize>,
 }
 
+impl fmt::Display for Position {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "line: {}, range: <{}, {}>",
+            self.line, self.range.start, self.range.end
+        )
+    }
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub enum ParserError {
-    #[error("expected `{:?}` on line {line}", token)]
-    ExpectedToken { line: usize, token: Token },
+    #[error("expected `{:?}` on {pos}", token)]
+    ExpectedToken { pos: Position, token: Token },
 }
 
 #[derive(Debug)]
@@ -24,8 +35,6 @@ pub struct Parser<'a> {
     current_token: Token,
     current_span: Range<usize>,
     peek_token: Token,
-
-    line: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -37,7 +46,6 @@ impl<'a> Parser<'a> {
             current_token: Token::EOF,
             current_span: 0..0,
             peek_token: Token::EOF,
-            line: 1,
         };
 
         parser.next_token();
@@ -114,7 +122,7 @@ impl<'a> Parser<'a> {
             Some(())
         } else {
             self.errors.push(ParserError::ExpectedToken {
-                line: self.line,
+                pos: self.position(),
                 token,
             });
             None
@@ -138,7 +146,7 @@ impl<'a> Parser<'a> {
             Ident(ident.to_owned())
         } else {
             self.errors.push(ParserError::ExpectedToken {
-                line: self.line,
+                pos: self.position(),
                 token: Token::Ident("".to_owned()),
             });
             return None;
