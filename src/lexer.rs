@@ -76,6 +76,12 @@ pub enum Token {
     #[token("return")]
     Return,
 
+    // Not explicitly tokenized, used in parser
+    EOF,
+
+    #[regex(r"\n")]
+    Newline,
+
     #[error]
     #[regex(r"[ \t\f]+", logos::skip)]
     Error,
@@ -317,6 +323,15 @@ mod tests {
     fn tokenizes_return() {
         let mut lexer = Token::lexer("return");
         assert_eq!(Token::Return, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_newline() {
+        let mut lexer = Token::lexer(
+            "
+            ",
+        );
+        assert_eq!(Token::Newline, lexer.next().expect("Should lex something"));
     }
 
     #[test]

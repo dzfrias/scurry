@@ -9,3 +9,4 @@ edition = "2021"
 logos = "0.12.1"
 clap = { version = "4.0.13", features = ["derive"] }
 rustyline = "10.0.0"
+thiserror = "1.0.37"
