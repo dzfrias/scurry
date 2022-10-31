@@ -16,11 +16,13 @@ pub enum Expr {
 pub struct AssignStmt {
     pub name: Ident,
     pub value: Expr,
+    pub line: usize,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct ReturnStmt {
     pub value: Expr,
+    pub line: usize,
 }
 
 #[derive(Debug, PartialEq)]

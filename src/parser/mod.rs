@@ -55,6 +55,8 @@ pub struct Parser<'a> {
     current_token: Token,
     current_span: Range<usize>,
     peek_token: Token,
+
+    line: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -66,6 +68,7 @@ impl<'a> Parser<'a> {
             current_token: Token::EOF,
             current_span: 0..0,
             peek_token: Token::EOF,
+            line: 1,
         };
 
         parser.next_token();
@@ -122,6 +125,11 @@ impl<'a> Parser<'a> {
         self.current_token = self.peek_token.clone();
         self.current_span = self.lexer.span();
         self.peek_token = self.lexer.next().unwrap_or(Token::EOF);
+        if self.current_token == Token::Newline {
+            self.line += 1;
+            // Get rid of newline and/or following ones
+            self.next_token();
+        }
     }
 
     fn parse_stmt(&mut self) -> Option<Stmt> {
@@ -173,7 +181,10 @@ impl<'a> Parser<'a> {
         while self.current_token != Token::Semicolon && self.current_token != Token::EOF {
             self.next_token();
         }
-        Some(ReturnStmt { value: Expr::Blank })
+        Some(ReturnStmt {
+            value: Expr::Blank,
+            line: self.line,
+        })
     }
 
     fn parse_assign_stmt(&mut self) -> Option<AssignStmt> {
@@ -193,6 +204,7 @@ impl<'a> Parser<'a> {
         Some(AssignStmt {
             name: ident,
             value: Expr::Blank,
+            line: self.line,
         })
     }
 
@@ -279,6 +291,7 @@ mod tests {
         let expecteds = [Stmt::Assign(AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Blank,
+            line: 1,
         })];
 
         test_parse!(inputs, expecteds)
@@ -287,7 +300,23 @@ mod tests {
     #[test]
     fn parse_return_stmt() {
         let inputs = ["return 3;"];
-        let expecteds = [Stmt::Return(ReturnStmt { value: Expr::Blank })];
+        let expecteds = [Stmt::Return(ReturnStmt {
+            value: Expr::Blank,
+            line: 1,
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_let_stmt_on_line_2() {
+        let inputs = ["
+            return 3;
+            "];
+        let expecteds = [Stmt::Return(ReturnStmt {
+            value: Expr::Blank,
+            line: 2,
+        })];
 
         test_parse!(inputs, expecteds)
     }

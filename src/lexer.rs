@@ -77,8 +77,11 @@ pub enum Token {
     // Not explicitly tokenized, used in parser
     EOF,
 
+    #[regex(r"\n")]
+    Newline,
+
     #[error]
-    #[regex(r"[ \n\t\f]+", logos::skip)]
+    #[regex(r"[ \t\f]+", logos::skip)]
     Error,
     #[regex("\"(?s:[^\"\\\\]|\\\\.)*")]
     ErrorUnterminatedString,
