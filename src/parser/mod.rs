@@ -46,7 +46,7 @@ pub enum ParserError {
     #[error("illegal character on {pos}")]
     IllegalCharacter { pos: Position },
 
-    #[error("no prefix operator `{:?}` on {pos}", token)]
+    #[error("invalid operator in this context: `{:?}` on {pos}", token)]
     InvalidPrefixOperator { token: Token, pos: Position },
 }
 
@@ -123,6 +123,19 @@ impl<'a> Parser<'a> {
     }
 
     pub fn position(&self) -> Position {
+        if self.current_token == Token::EOF {
+            let last_line_count = self
+                .lexer
+                .source()
+                .lines()
+                .last()
+                .expect("Source should have one line")
+                .len();
+            return Position {
+                line: self.lexer.source().lines().count(),
+                range: last_line_count - 1..last_line_count,
+            };
+        }
         let mut lineno = 1;
         let mut char_index = 0;
         let start = self.current_span.start;
@@ -144,7 +157,6 @@ impl<'a> Parser<'a> {
                 char_index += 1;
                 None
             })
-            // WARNING: Panics if whitespace is the error
             .expect("Current char should be in source");
         Position {
             line: lineno,
