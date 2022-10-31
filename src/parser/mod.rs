@@ -144,6 +144,7 @@ impl<'a> Parser<'a> {
                 char_index += 1;
                 None
             })
+            // WARNING: Panics if whitespace is the error
             .expect("Current char should be in source");
         Position {
             line: lineno,
@@ -296,11 +297,12 @@ impl<'a> Parser<'a> {
 
     fn parse_return_stmt(&mut self) -> Option<ReturnStmt> {
         self.next_token();
-        while self.current_token != Token::Semicolon && self.current_token != Token::EOF {
+        let return_val = self.parse_expr(Precedence::Lowest)?;
+        if self.peek_token == Token::Semicolon {
             self.next_token();
         }
         Some(ReturnStmt {
-            value: Expr::Blank,
+            value: return_val,
             line: self.line,
         })
     }
@@ -316,12 +318,14 @@ impl<'a> Parser<'a> {
             return None;
         };
         self.expect_peek(Token::Assign)?;
-        while self.current_token != Token::Semicolon && self.current_token != Token::EOF {
+        self.next_token();
+        let value = self.parse_expr(Precedence::Lowest)?;
+        if self.peek_token == Token::Semicolon {
             self.next_token();
         }
         Some(AssignStmt {
             name: ident,
-            value: Expr::Blank,
+            value,
             line: self.line,
         })
     }
@@ -409,7 +413,7 @@ mod tests {
         let inputs = ["x = 3;"];
         let expecteds = [Stmt::Assign(AssignStmt {
             name: Ident("x".to_owned()),
-            value: Expr::Blank,
+            value: Expr::Literal(Literal::Integer(3)),
             line: 1,
         })];
 
@@ -420,7 +424,7 @@ mod tests {
     fn parse_return_stmt() {
         let inputs = ["return 3;"];
         let expecteds = [Stmt::Return(ReturnStmt {
-            value: Expr::Blank,
+            value: Expr::Literal(Literal::Integer(3)),
             line: 1,
         })];
 
@@ -433,7 +437,7 @@ mod tests {
             return 3;
             "];
         let expecteds = [Stmt::Return(ReturnStmt {
-            value: Expr::Blank,
+            value: Expr::Literal(Literal::Integer(3)),
             line: 2,
         })];
 

@@ -10,6 +10,10 @@ pub enum Token {
     Integer(i32),
     #[regex("\"(?s:[^\"\\\\]|\\\\.)*\"", |lex| lex.slice().strip_prefix("\"").expect("Should have leading \"").strip_suffix("\"").expect("Should have trailing \"").to_owned())]
     String(String),
+    #[token("True")]
+    True,
+    #[token("False")]
+    False,
 
     #[token("=")]
     Assign,
@@ -63,10 +67,6 @@ pub enum Token {
 
     #[token("fn")]
     Function,
-    #[token("True")]
-    True,
-    #[token("False")]
-    False,
     #[token("if")]
     If,
     #[token("else")]

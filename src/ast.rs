@@ -3,7 +3,6 @@ use core::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
-    Blank,
     Assign(AssignStmt),
     Return(ReturnStmt),
     Expr(Expr),
@@ -12,7 +11,6 @@ pub enum Stmt {
 impl fmt::Display for Stmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Blank => write!(f, "BLANK"),
             Self::Assign(stmt) => write!(f, "{stmt}"),
             Self::Return(stmt) => write!(f, "{stmt}"),
             Self::Expr(expr) => write!(f, "{expr}"),
