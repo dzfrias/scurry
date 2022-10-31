@@ -213,6 +213,9 @@ impl<'a> Parser<'a> {
 
     fn parse_expr_stmt(&mut self) -> Option<Expr> {
         let expr = self.parse_expr(Precedence::Lowest)?;
+        if self.peek_token == Token::Semicolon {
+            self.next_token();
+        }
         Some(expr)
     }
 
