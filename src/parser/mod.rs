@@ -208,14 +208,12 @@ impl<'a> Parser<'a> {
             // Expression on one line
             _ => Stmt::Expr(self.parse_expr_stmt()?),
         };
+        self.expect_peek(Token::Semicolon)?;
         Some(stmt)
     }
 
     fn parse_expr_stmt(&mut self) -> Option<Expr> {
         let expr = self.parse_expr(Precedence::Lowest)?;
-        if self.peek_token == Token::Semicolon {
-            self.next_token();
-        }
         Some(expr)
     }
 
@@ -301,9 +299,6 @@ impl<'a> Parser<'a> {
     fn parse_return_stmt(&mut self) -> Option<ReturnStmt> {
         self.next_token();
         let return_val = self.parse_expr(Precedence::Lowest)?;
-        if self.peek_token == Token::Semicolon {
-            self.next_token();
-        }
         Some(ReturnStmt {
             value: return_val,
             line: self.line,
@@ -323,9 +318,6 @@ impl<'a> Parser<'a> {
         self.expect_peek(Token::Assign)?;
         self.next_token();
         let value = self.parse_expr(Precedence::Lowest)?;
-        if self.peek_token == Token::Semicolon {
-            self.next_token();
-        }
         Some(AssignStmt {
             name: ident,
             value,
