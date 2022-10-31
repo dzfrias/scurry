@@ -46,6 +46,9 @@ fn start_repl() -> Result<()> {
                                 ParserError::UnteriminatedString { pos } => {
                                     println!("{}", format_position(&line, pos));
                                 }
+                                ParserError::InvalidPrefixOperator { pos, .. } => {
+                                    println!("{}", format_position(&line, pos));
+                                }
                             }
                             println!("{s}");
                         }

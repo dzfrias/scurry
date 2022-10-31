@@ -45,6 +45,36 @@ pub enum ParserError {
 
     #[error("illegal character on {pos}")]
     IllegalCharacter { pos: Position },
+
+    #[error("no prefix operator `{:?}` on {pos}", token)]
+    InvalidPrefixOperator { token: Token, pos: Position },
+}
+
+#[derive(Debug, PartialEq, PartialOrd)]
+#[allow(dead_code)]
+enum Precedence {
+    Lowest,
+    Equals,
+    LessGreater,
+    Sum,
+    Product,
+    Prefix,
+    Call,
+    Index,
+}
+
+impl From<&Token> for Precedence {
+    fn from(token: &Token) -> Self {
+        match token {
+            Token::Eq | Token::NotEq => Precedence::Equals,
+            Token::Lt | Token::Gt | Token::Le | Token::Ge => Precedence::LessGreater,
+            Token::Plus | Token::Minus => Precedence::Sum,
+            Token::Slash | Token::Asterisk | Token::Percent => Precedence::Product,
+            Token::Lparen => Precedence::Call,
+            Token::Lbracket => Precedence::Index,
+            _ => Precedence::Lowest,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -132,6 +162,27 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn expect_peek(&mut self, token: Token) -> Option<()> {
+        if self.peek_token == token {
+            self.next_token();
+            Some(())
+        } else {
+            self.errors.push(ParserError::ExpectedToken {
+                pos: self.position(),
+                token,
+            });
+            None
+        }
+    }
+
+    fn peek_prec(&self) -> Precedence {
+        Precedence::from(&self.peek_token)
+    }
+
+    fn current_prec(&self) -> Precedence {
+        Precedence::from(&self.current_token)
+    }
+
     fn parse_stmt(&mut self) -> Option<Stmt> {
         let stmt = match self.current_token {
             Token::Ident(_) if self.peek_token == Token::Assign => {
@@ -159,21 +210,88 @@ impl<'a> Parser<'a> {
         Some(stmt)
     }
 
-    fn expect_peek(&mut self, token: Token) -> Option<()> {
-        if self.peek_token == token {
-            self.next_token();
-            Some(())
+    fn parse_expr_stmt(&mut self) -> Option<Expr> {
+        let expr = self.parse_expr(Precedence::Lowest)?;
+        Some(expr)
+    }
+
+    fn parse_expr(&mut self, precedence: Precedence) -> Option<Expr> {
+        let mut left_exp = match self.current_token {
+            Token::Integer(i) => Expr::Literal(Literal::Integer(i)),
+            Token::True => Expr::Literal(Literal::Boolean(true)),
+            Token::False => Expr::Literal(Literal::Boolean(false)),
+            Token::String(ref s) => Expr::Literal(Literal::String(s.to_owned())),
+            Token::Ident(_) => Expr::Ident(self.parse_ident().expect("Should be on ident")),
+            Token::Bang | Token::Minus | Token::Plus => Expr::Prefix(self.parse_prefix_expr()?),
+            Token::Lparen => self.parse_grouped_expr()?,
+            _ => {
+                self.errors.push(ParserError::InvalidPrefixOperator {
+                    token: self.current_token.clone(),
+                    pos: self.position(),
+                });
+                return None;
+            }
+        };
+
+        while self.peek_token != Token::Semicolon && precedence < self.peek_prec() {
+            left_exp = match self.peek_token {
+                Token::Plus
+                | Token::Minus
+                | Token::Asterisk
+                | Token::Slash
+                | Token::Eq
+                | Token::NotEq
+                | Token::Lt
+                | Token::Gt
+                | Token::Ge
+                | Token::Le
+                | Token::Percent => {
+                    self.next_token();
+                    Expr::Infix(self.parse_infix_expr(left_exp)?)
+                }
+                _ => return Some(left_exp),
+            }
+        }
+        Some(left_exp)
+    }
+
+    fn parse_ident(&self) -> Option<Ident> {
+        if let Token::Ident(name) = &self.current_token {
+            Some(Ident(name.to_owned()))
         } else {
-            self.errors.push(ParserError::ExpectedToken {
-                pos: self.position(),
-                token,
-            });
             None
         }
     }
 
-    fn parse_expr_stmt(&mut self) -> Option<Expr> {
-        Some(Expr::Blank)
+    fn parse_grouped_expr(&mut self) -> Option<Expr> {
+        if self.current_token != Token::Lparen {
+            return None;
+        }
+        self.next_token();
+        let expr = self.parse_expr(Precedence::Lowest)?;
+        self.expect_peek(Token::Rparen)?;
+        Some(expr)
+    }
+
+    fn parse_infix_expr(&mut self, left: Expr) -> Option<InfixExpr> {
+        let infix_op = InfixOp::try_from(&self.current_token).ok()?;
+        self.next_token();
+        let right = self.parse_expr(self.current_prec())?;
+        Some(InfixExpr {
+            left: Box::new(left),
+            op: infix_op,
+            right: Box::new(right),
+        })
+    }
+
+    fn parse_prefix_expr(&mut self) -> Option<PrefixExpr> {
+        let prefix_op = PrefixOp::try_from(&self.current_token).ok()?;
+        self.next_token();
+        let expr = self.parse_expr(Precedence::Prefix)?;
+        Some(PrefixExpr {
+            op: prefix_op,
+            left: Box::new(expr),
+        })
     }
 
     fn parse_return_stmt(&mut self) -> Option<ReturnStmt> {
@@ -208,6 +326,7 @@ impl<'a> Parser<'a> {
         })
     }
 
+    // TODO: Parse if statement
     fn parse_if_stmt(&mut self) -> Stmt {
         todo!()
     }
