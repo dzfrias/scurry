@@ -309,7 +309,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_let_stmt_on_line_2() {
+    fn parse_stmt_on_line_2() {
         let inputs = ["
             return 3;
             "];
