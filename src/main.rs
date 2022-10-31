@@ -1,7 +1,8 @@
 use clap::Parser as ArgParser;
 use rustyline::error::ReadlineError;
 use rustyline::{Config, Editor, Result};
-use scurry::parser::Parser;
+use scurry::format_position;
+use scurry::parser::{Parser, ParserError};
 use std::process;
 
 #[derive(Debug, ArgParser)]
@@ -31,8 +32,22 @@ fn start_repl() -> Result<()> {
                         }
                     }
                     Err(errs) => {
+                        println!("parser errors:");
                         for err in errs {
-                            println!("{err}");
+                            let s = err.to_string();
+                            println!();
+                            match err {
+                                ParserError::ExpectedToken { pos, .. } => {
+                                    println!("{}", format_position(&line, pos))
+                                }
+                                ParserError::IllegalCharacter { pos } => {
+                                    println!("{}", format_position(&line, pos));
+                                }
+                                ParserError::UnteriminatedString { pos } => {
+                                    println!("{}", format_position(&line, pos));
+                                }
+                            }
+                            println!("{s}");
                         }
                     }
                 }

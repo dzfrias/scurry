@@ -11,6 +11,16 @@ pub struct Position {
     range: Range<usize>,
 }
 
+impl Position {
+    pub fn line(&self) -> usize {
+        self.line
+    }
+
+    pub fn range(&self) -> &Range<usize> {
+        &self.range
+    }
+}
+
 impl fmt::Display for Position {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.range.len() == 1 {
