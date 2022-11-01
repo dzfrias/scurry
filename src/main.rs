@@ -21,9 +21,12 @@ fn start_repl() -> Result<()> {
     loop {
         let readline = editor.readline(PROMPT);
         match readline {
-            Ok(line) => {
+            Ok(mut line) => {
                 editor.add_history_entry(line.as_str());
 
+                if !line.ends_with(";") {
+                    line.push(';');
+                }
                 let parser = Parser::new(&line);
                 match parser.parse() {
                     Ok(program) => {
