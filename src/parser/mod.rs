@@ -835,4 +835,17 @@ mod tests {
 
         test_parse!(inputs, expecteds)
     }
+
+    #[test]
+    fn rbrace_stmts_have_optional_semicolons() {
+        let inputs = ["if 1 { 3; }"];
+        let expecteds = [Stmt::If(IfStmt {
+            condition: Expr::Literal(Literal::Integer(1)),
+            true_block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            else_block: None,
+            elifs: Vec::new(),
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
 }
