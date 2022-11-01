@@ -848,4 +848,25 @@ mod tests {
 
         test_parse!(inputs, expecteds)
     }
+
+    #[test]
+    fn errors_appear_in_expressions_nested_in_statements() {
+        let inputs = ["return \"hello", "x = #;"];
+        let errs = [
+            ParserError::UnteriminatedString {
+                pos: Position {
+                    line: 1,
+                    range: 7..13,
+                },
+            },
+            ParserError::IllegalCharacter {
+                pos: Position {
+                    line: 1,
+                    range: 4..5,
+                },
+            },
+        ];
+
+        test_parse_errs!(inputs, errs)
+    }
 }
