@@ -450,4 +450,237 @@ mod tests {
 
         test_parse!(inputs, expecteds)
     }
+
+    #[test]
+    fn operator_parsing_doesnt_cause_panic_with_eof() {
+        let inputs = ["1+"];
+        let errs = [ParserError::InvalidPrefixOperator {
+            token: Token::EOF,
+            pos: Position {
+                line: 1,
+                range: 1..2,
+            },
+        }];
+
+        test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn invalid_prefix_operators_recognized() {
+        let inputs = ["/1;", "=1;"];
+        let errs = [
+            ParserError::InvalidPrefixOperator {
+                token: Token::Slash,
+                pos: Position {
+                    line: 1,
+                    range: 0..1,
+                },
+            },
+            ParserError::InvalidPrefixOperator {
+                token: Token::Assign,
+                pos: Position {
+                    line: 1,
+                    range: 0..1,
+                },
+            },
+        ];
+
+        test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn needs_semicolon_at_end_of_statements() {
+        let inputs = ["x = 3", "return 3", "333"];
+        let errs = [
+            ParserError::ExpectedToken {
+                pos: Position {
+                    line: 1,
+                    range: 4..5,
+                },
+                token: Token::Semicolon,
+            },
+            ParserError::ExpectedToken {
+                pos: Position {
+                    line: 1,
+                    range: 7..8,
+                },
+                token: Token::Semicolon,
+            },
+            ParserError::ExpectedToken {
+                pos: Position {
+                    line: 1,
+                    range: 0..3,
+                },
+                token: Token::Semicolon,
+            },
+        ];
+
+        test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn parser_throws_error_at_invalid_tokens() {
+        let inputs = ["#", "$", "&"];
+        let errs = [
+            ParserError::IllegalCharacter {
+                pos: Position {
+                    line: 1,
+                    range: 0..1,
+                },
+            },
+            ParserError::IllegalCharacter {
+                pos: Position {
+                    line: 1,
+                    range: 0..1,
+                },
+            },
+            ParserError::IllegalCharacter {
+                pos: Position {
+                    line: 1,
+                    range: 0..1,
+                },
+            },
+        ];
+
+        test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn parser_throws_error_at_unterminated_string() {
+        let inputs = ["\"invalid!", "\"two words"];
+        let errs = [
+            ParserError::UnteriminatedString {
+                pos: Position {
+                    line: 1,
+                    range: 0..9,
+                },
+            },
+            ParserError::UnteriminatedString {
+                pos: Position {
+                    line: 1,
+                    range: 0..10,
+                },
+            },
+        ];
+
+        test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn parse_basic_binary_operators() {
+        let inputs = [
+            "3 + 3;", "4 / 5;", "2 * 2;", "4 - 4;", "20 % 2;", "3 == 3;", "6 >= 3;", "8 != 8;",
+        ];
+        let expecteds = [
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(3))),
+                op: InfixOp::Plus,
+                right: Box::new(Expr::Literal(Literal::Integer(3))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(4))),
+                op: InfixOp::Slash,
+                right: Box::new(Expr::Literal(Literal::Integer(5))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(2))),
+                op: InfixOp::Asterisk,
+                right: Box::new(Expr::Literal(Literal::Integer(2))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(4))),
+                op: InfixOp::Minus,
+                right: Box::new(Expr::Literal(Literal::Integer(4))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(20))),
+                op: InfixOp::Modulo,
+                right: Box::new(Expr::Literal(Literal::Integer(2))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(3))),
+                op: InfixOp::Eq,
+                right: Box::new(Expr::Literal(Literal::Integer(3))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(6))),
+                op: InfixOp::Ge,
+                right: Box::new(Expr::Literal(Literal::Integer(3))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(8))),
+                op: InfixOp::NotEq,
+                right: Box::new(Expr::Literal(Literal::Integer(8))),
+            })),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_unary_operators() {
+        let inputs = ["-1;", "!True;", "+44;"];
+        let expecteds = [
+            Stmt::Expr(Expr::Prefix(PrefixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(1))),
+                op: PrefixOp::Minus,
+            })),
+            Stmt::Expr(Expr::Prefix(PrefixExpr {
+                left: Box::new(Expr::Literal(Literal::Boolean(true))),
+                op: PrefixOp::Bang,
+            })),
+            Stmt::Expr(Expr::Prefix(PrefixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(44))),
+                op: PrefixOp::Plus,
+            })),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn operator_precedence() {
+        let inputs = ["-1 + 4;", "4 - 4 * 3;", "(3 + 3) * 4;", "-1 + -1;"];
+        let expecteds = [
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Prefix(PrefixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(1))),
+                    op: PrefixOp::Minus,
+                })),
+                op: InfixOp::Plus,
+                right: Box::new(Expr::Literal(Literal::Integer(4))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(4))),
+                op: InfixOp::Minus,
+                right: Box::new(Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(4))),
+                    op: InfixOp::Asterisk,
+                    right: Box::new(Expr::Literal(Literal::Integer(3))),
+                })),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(3))),
+                    op: InfixOp::Plus,
+                    right: Box::new(Expr::Literal(Literal::Integer(3))),
+                })),
+                op: InfixOp::Asterisk,
+                right: Box::new(Expr::Literal(Literal::Integer(4))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Prefix(PrefixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(1))),
+                    op: PrefixOp::Minus,
+                })),
+                op: InfixOp::Plus,
+                right: Box::new(Expr::Prefix(PrefixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(1))),
+                    op: PrefixOp::Minus,
+                })),
+            })),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
 }
