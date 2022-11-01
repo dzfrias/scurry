@@ -48,6 +48,9 @@ pub enum ParserError {
 
     #[error("invalid operator in this context: `{:?}` on {pos}", token)]
     InvalidPrefixOperator { token: Token, pos: Position },
+
+    #[error("illegal ident, cannot have number in front: `{:?}` on {pos}", ident)]
+    InvalidIdent { ident: String, pos: Position },
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -204,19 +207,6 @@ impl<'a> Parser<'a> {
             Token::Return => Stmt::Return(self.parse_return_stmt()?),
             Token::If => Stmt::If(self.parse_if_stmt()?),
 
-            Token::Error => {
-                self.errors.push(ParserError::IllegalCharacter {
-                    pos: self.position(),
-                });
-                return None;
-            }
-            Token::ErrorUnterminatedString => {
-                self.errors.push(ParserError::UnteriminatedString {
-                    pos: self.position(),
-                });
-                return None;
-            }
-
             // Expression on one line
             _ => Stmt::Expr(self.parse_expr_stmt()?),
         };
@@ -238,6 +228,25 @@ impl<'a> Parser<'a> {
             Token::Ident(_) => Expr::Ident(self.parse_ident().expect("Should be on ident")),
             Token::Bang | Token::Minus | Token::Plus => Expr::Prefix(self.parse_prefix_expr()?),
             Token::Lparen => self.parse_grouped_expr()?,
+            Token::Error => {
+                self.errors.push(ParserError::IllegalCharacter {
+                    pos: self.position(),
+                });
+                return None;
+            }
+            Token::ErrorUnterminatedString => {
+                self.errors.push(ParserError::UnteriminatedString {
+                    pos: self.position(),
+                });
+                return None;
+            }
+            Token::ErrorInvalidIdent(ref s) => {
+                self.errors.push(ParserError::InvalidIdent {
+                    ident: s.to_owned(),
+                    pos: self.position(),
+                });
+                return None;
+            }
             _ => {
                 self.errors.push(ParserError::InvalidPrefixOperator {
                     token: self.current_token.clone(),

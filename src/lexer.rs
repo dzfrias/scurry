@@ -2,11 +2,11 @@ use logos::{self, Logos};
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token {
-    #[regex(r"[_A-Za-z][_A-Za-z0-9]*", |lex| lex.slice().to_owned())]
+    #[regex(r"[_A-Za-z][_A-Za-z0-9]*", |lex| lex.slice().to_owned(), priority = 2)]
     Ident(String),
     #[regex(r"[0-9]+\.[0-9]+", |lex| lex.slice().parse())]
     Float(f32),
-    #[regex(r"[0-9]+", |lex| lex.slice().parse())]
+    #[regex(r"[0-9]+", |lex| lex.slice().parse(), priority = 2)]
     Integer(i32),
     #[regex("\"(?s:[^\"\\\\]|\\\\.)*\"", |lex| lex.slice().strip_prefix("\"").expect("Should have leading \"").strip_suffix("\"").expect("Should have trailing \"").to_owned())]
     String(String),
@@ -87,6 +87,8 @@ pub enum Token {
     Error,
     #[regex("\"(?s:[^\"\\\\]|\\\\.)*")]
     ErrorUnterminatedString,
+    #[regex("[_A-Za-z0-9][_A-Za-z0-9]*", |lex| lex.slice().to_owned())]
+    ErrorInvalidIdent(String),
 }
 
 #[cfg(test)]
@@ -107,6 +109,15 @@ mod tests {
         let mut lexer = Token::lexer("abcd1");
         assert_eq!(
             Token::Ident("abcd1".to_owned()),
+            lexer.next().expect("Should lex something")
+        )
+    }
+
+    #[test]
+    fn does_not_recognized_ident_with_number_in_front() {
+        let mut lexer = Token::lexer("1abcd");
+        assert_eq!(
+            Token::ErrorInvalidIdent("1abcd".to_owned()),
             lexer.next().expect("Should lex something")
         )
     }

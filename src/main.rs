@@ -21,12 +21,9 @@ fn start_repl() -> Result<()> {
     loop {
         let readline = editor.readline(PROMPT);
         match readline {
-            Ok(mut line) => {
+            Ok(line) => {
                 editor.add_history_entry(line.as_str());
 
-                if !line.ends_with(";") {
-                    line.push(';');
-                }
                 let parser = Parser::new(&line);
                 match parser.parse() {
                     Ok(program) => {
@@ -41,6 +38,9 @@ fn start_repl() -> Result<()> {
                             println!();
                             match err {
                                 ParserError::ExpectedToken { pos, .. } => {
+                                    println!("{}", format_position(&line, pos))
+                                }
+                                ParserError::InvalidIdent { pos, .. } => {
                                     println!("{}", format_position(&line, pos))
                                 }
                                 ParserError::IllegalCharacter { pos } => {
