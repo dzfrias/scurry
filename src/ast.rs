@@ -1,10 +1,8 @@
-// TODO: Add line numbers to expressions
 use crate::lexer::Token;
 use core::fmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
-    Blank,
     Ident(Ident),
     Literal(Literal),
     Infix(InfixExpr),
@@ -14,7 +12,6 @@ pub enum Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Blank => write!(f, "BLANK"),
             Self::Ident(ident) => write!(f, "{ident}"),
             Self::Literal(literal) => write!(f, "{literal}"),
             Self::Infix(infix) => write!(f, "{infix}"),
@@ -28,6 +25,7 @@ pub struct InfixExpr {
     pub left: Box<Expr>,
     pub op: InfixOp,
     pub right: Box<Expr>,
+    pub line: usize,
 }
 
 impl fmt::Display for InfixExpr {
@@ -40,6 +38,7 @@ impl fmt::Display for InfixExpr {
 pub struct PrefixExpr {
     pub left: Box<Expr>,
     pub op: PrefixOp,
+    pub line: usize,
 }
 
 impl fmt::Display for PrefixExpr {
@@ -150,6 +149,9 @@ impl fmt::Display for PrefixOp {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct Ident(pub String);
+
+#[derive(Debug, PartialEq)]
 pub enum Stmt {
     Assign(AssignStmt),
     Return(ReturnStmt),
@@ -225,9 +227,6 @@ impl fmt::Display for ElifStmt {
         write!(f, "elif {} {{ {} }}", self.condition, self.block)
     }
 }
-
-#[derive(Debug, PartialEq)]
-pub struct Ident(pub String);
 
 impl fmt::Display for Ident {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

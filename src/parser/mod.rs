@@ -308,6 +308,7 @@ impl<'a> Parser<'a> {
             left: Box::new(left),
             op: infix_op,
             right: Box::new(right),
+            line: self.line,
         })
     }
 
@@ -318,6 +319,7 @@ impl<'a> Parser<'a> {
         Some(PrefixExpr {
             op: prefix_op,
             left: Box::new(expr),
+            line: self.line,
         })
     }
 
@@ -642,41 +644,49 @@ mod tests {
                 left: Box::new(Expr::Literal(Literal::Integer(3))),
                 op: InfixOp::Plus,
                 right: Box::new(Expr::Literal(Literal::Integer(3))),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(4))),
                 op: InfixOp::Slash,
                 right: Box::new(Expr::Literal(Literal::Integer(5))),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(2))),
                 op: InfixOp::Asterisk,
                 right: Box::new(Expr::Literal(Literal::Integer(2))),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(4))),
                 op: InfixOp::Minus,
                 right: Box::new(Expr::Literal(Literal::Integer(4))),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(20))),
                 op: InfixOp::Modulo,
                 right: Box::new(Expr::Literal(Literal::Integer(2))),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(3))),
                 op: InfixOp::Eq,
                 right: Box::new(Expr::Literal(Literal::Integer(3))),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(6))),
                 op: InfixOp::Ge,
                 right: Box::new(Expr::Literal(Literal::Integer(3))),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(8))),
                 op: InfixOp::NotEq,
                 right: Box::new(Expr::Literal(Literal::Integer(8))),
+                line: 1,
             })),
         ];
 
@@ -690,14 +700,17 @@ mod tests {
             Stmt::Expr(Expr::Prefix(PrefixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(1))),
                 op: PrefixOp::Minus,
+                line: 1,
             })),
             Stmt::Expr(Expr::Prefix(PrefixExpr {
                 left: Box::new(Expr::Literal(Literal::Boolean(true))),
                 op: PrefixOp::Bang,
+                line: 1,
             })),
             Stmt::Expr(Expr::Prefix(PrefixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(44))),
                 op: PrefixOp::Plus,
+                line: 1,
             })),
         ];
 
@@ -712,9 +725,11 @@ mod tests {
                 left: Box::new(Expr::Prefix(PrefixExpr {
                     left: Box::new(Expr::Literal(Literal::Integer(1))),
                     op: PrefixOp::Minus,
+                    line: 1,
                 })),
                 op: InfixOp::Plus,
                 right: Box::new(Expr::Literal(Literal::Integer(4))),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Literal(Literal::Integer(4))),
@@ -723,27 +738,34 @@ mod tests {
                     left: Box::new(Expr::Literal(Literal::Integer(4))),
                     op: InfixOp::Asterisk,
                     right: Box::new(Expr::Literal(Literal::Integer(3))),
+                    line: 1,
                 })),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Infix(InfixExpr {
                     left: Box::new(Expr::Literal(Literal::Integer(3))),
                     op: InfixOp::Plus,
                     right: Box::new(Expr::Literal(Literal::Integer(3))),
+                    line: 1,
                 })),
                 op: InfixOp::Asterisk,
                 right: Box::new(Expr::Literal(Literal::Integer(4))),
+                line: 1,
             })),
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Prefix(PrefixExpr {
                     left: Box::new(Expr::Literal(Literal::Integer(1))),
                     op: PrefixOp::Minus,
+                    line: 1,
                 })),
                 op: InfixOp::Plus,
                 right: Box::new(Expr::Prefix(PrefixExpr {
                     left: Box::new(Expr::Literal(Literal::Integer(1))),
                     op: PrefixOp::Minus,
+                    line: 1,
                 })),
+                line: 1,
             })),
         ];
 
@@ -868,5 +890,24 @@ mod tests {
         ];
 
         test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn parser_tracks_line_numbers_in_expressions() {
+        let inputs = ["(1 + 1)
+        * 3;"];
+        let expecteds = [Stmt::Expr(Expr::Infix(InfixExpr {
+            left: Box::new(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(1))),
+                op: InfixOp::Plus,
+                right: Box::new(Expr::Literal(Literal::Integer(1))),
+                line: 1,
+            })),
+            op: InfixOp::Asterisk,
+            right: Box::new(Expr::Literal(Literal::Integer(3))),
+            line: 2,
+        }))];
+
+        test_parse!(inputs, expecteds)
     }
 }
