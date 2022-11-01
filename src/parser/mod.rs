@@ -210,7 +210,11 @@ impl<'a> Parser<'a> {
             // Expression on one line
             _ => Stmt::Expr(self.parse_expr_stmt()?),
         };
-        self.expect_peek(Token::Semicolon)?;
+        if self.current_token == Token::Rbrace && self.peek_token == Token::Semicolon {
+            self.next_token();
+        } else if self.current_token != Token::Rbrace {
+            self.expect_peek(Token::Semicolon);
+        }
         Some(stmt)
     }
 

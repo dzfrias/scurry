@@ -201,16 +201,28 @@ pub struct IfStmt {
     pub elifs: Vec<ElifStmt>,
 }
 
+impl fmt::Display for IfStmt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut s = String::from(format!("if {} {{{}}}", self.condition, self.true_block));
+        for elif in &self.elifs {
+            s.push_str(&format!(" {elif}"));
+        }
+        if let Some(else_block) = &self.else_block {
+            s.push_str(&format!(" else {{ {} }}", else_block))
+        }
+        write!(f, "{s};")
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ElifStmt {
     pub condition: Expr,
     pub block: Block,
 }
 
-impl fmt::Display for IfStmt {
+impl fmt::Display for ElifStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
-        // write!(f, "return {};", self.value)
+        write!(f, "elif {} {{ {} }}", self.condition, self.block)
     }
 }
 
@@ -225,5 +237,22 @@ impl fmt::Display for Ident {
 
 #[derive(Debug, PartialEq)]
 pub struct Block(pub Vec<Stmt>);
+
+impl fmt::Display for Block {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let joined = self
+            .0
+            .iter()
+            .map(|stmt| stmt.to_string() + " ")
+            .collect::<String>();
+        write!(
+            f,
+            "{}",
+            joined
+                .strip_suffix(", ")
+                .expect("Should have trailing ', '")
+        )
+    }
+}
 
 pub type Program = Block;
