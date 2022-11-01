@@ -71,6 +71,8 @@ pub enum Token {
     If,
     #[token("else")]
     Else,
+    #[token("elif")]
+    Elif,
     #[token("return")]
     Return,
 
@@ -315,6 +317,12 @@ mod tests {
     fn tokenizes_return() {
         let mut lexer = Token::lexer("return");
         assert_eq!(Token::Return, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_elseif() {
+        let mut lexer = Token::lexer("elif");
+        assert_eq!(Token::Elif, lexer.next().expect("Should lex something"));
     }
 
     #[test]

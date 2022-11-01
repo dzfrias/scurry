@@ -1,22 +1,6 @@
+// TODO: Add line numbers to expressions
 use crate::lexer::Token;
 use core::fmt;
-
-#[derive(Debug, PartialEq)]
-pub enum Stmt {
-    Assign(AssignStmt),
-    Return(ReturnStmt),
-    Expr(Expr),
-}
-
-impl fmt::Display for Stmt {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Assign(stmt) => write!(f, "{stmt}"),
-            Self::Return(stmt) => write!(f, "{stmt}"),
-            Self::Expr(expr) => write!(f, "{expr}"),
-        }
-    }
-}
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -166,6 +150,25 @@ impl fmt::Display for PrefixOp {
 }
 
 #[derive(Debug, PartialEq)]
+pub enum Stmt {
+    Assign(AssignStmt),
+    Return(ReturnStmt),
+    If(IfStmt),
+    Expr(Expr),
+}
+
+impl fmt::Display for Stmt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Assign(stmt) => write!(f, "{stmt}"),
+            Self::Return(stmt) => write!(f, "{stmt}"),
+            Self::If(stmt) => write!(f, "{stmt}"),
+            Self::Expr(expr) => write!(f, "{expr}"),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct AssignStmt {
     pub name: Ident,
     pub value: Expr,
@@ -187,6 +190,27 @@ pub struct ReturnStmt {
 impl fmt::Display for ReturnStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "return {};", self.value)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IfStmt {
+    pub condition: Expr,
+    pub true_block: Block,
+    pub else_block: Option<Block>,
+    pub elifs: Vec<ElifStmt>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ElifStmt {
+    pub condition: Expr,
+    pub block: Block,
+}
+
+impl fmt::Display for IfStmt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+        // write!(f, "return {};", self.value)
     }
 }
 

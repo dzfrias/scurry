@@ -43,7 +43,7 @@ pub enum ParserError {
     #[error("unteriminated string on {pos}")]
     UnteriminatedString { pos: Position },
 
-    #[error("illegal character on {pos}")]
+    #[error("illegal character(s) on {pos}")]
     IllegalCharacter { pos: Position },
 
     #[error("invalid operator in this context: `{:?}` on {pos}", token)]
@@ -168,10 +168,10 @@ impl<'a> Parser<'a> {
         self.current_token = self.peek_token.clone();
         self.current_span = self.lexer.span();
         self.peek_token = self.lexer.next().unwrap_or(Token::EOF);
-        if self.current_token == Token::Newline {
+        // Remove as many future newlines as possible
+        while self.peek_token == Token::Newline {
+            self.peek_token = self.lexer.next().unwrap_or(Token::EOF);
             self.line += 1;
-            // Get rid of newline and/or following ones
-            self.next_token();
         }
     }
 
@@ -202,7 +202,7 @@ impl<'a> Parser<'a> {
                 Stmt::Assign(self.parse_assign_stmt()?)
             }
             Token::Return => Stmt::Return(self.parse_return_stmt()?),
-            Token::If => self.parse_if_stmt(),
+            Token::If => Stmt::If(self.parse_if_stmt()?),
 
             Token::Error => {
                 self.errors.push(ParserError::IllegalCharacter {
@@ -337,9 +337,49 @@ impl<'a> Parser<'a> {
         })
     }
 
-    // TODO: Parse if statement
-    fn parse_if_stmt(&mut self) -> Stmt {
-        todo!()
+    fn parse_if_stmt(&mut self) -> Option<IfStmt> {
+        self.next_token();
+        let condition = self.parse_expr(Precedence::Lowest)?;
+        self.expect_peek(Token::Lbrace)?;
+        let true_block = self.parse_block()?;
+        let mut elifs = Vec::new();
+        while self.peek_token == Token::Elif {
+            // To elif
+            self.next_token();
+            // To expression
+            self.next_token();
+            let condition = self.parse_expr(Precedence::Lowest)?;
+            self.expect_peek(Token::Lbrace)?;
+            let elif_block = self.parse_block()?;
+            elifs.push(ElifStmt {
+                condition,
+                block: elif_block,
+            });
+        }
+        let mut else_block = None;
+        if self.peek_token == Token::Else {
+            self.next_token();
+            self.expect_peek(Token::Lbrace)?;
+            else_block = Some(self.parse_block()?);
+        }
+        Some(IfStmt {
+            condition,
+            true_block,
+            else_block,
+            elifs,
+        })
+    }
+
+    fn parse_block(&mut self) -> Option<Block> {
+        let mut statements = Block(Vec::new());
+        self.next_token();
+        while self.current_token != Token::Rbrace && self.current_token != Token::EOF {
+            if let Some(stmt) = self.parse_stmt() {
+                statements.0.push(stmt);
+            }
+            self.next_token();
+        }
+        Some(statements)
     }
 }
 
@@ -422,6 +462,19 @@ mod tests {
             name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
             line: 1,
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_stmt_with_no_significant_whitespace() {
+        let inputs = ["x
+            = 3;"];
+        let expecteds = [Stmt::Assign(AssignStmt {
+            name: Ident("x".to_owned()),
+            value: Expr::Literal(Literal::Integer(3)),
+            line: 2,
         })];
 
         test_parse!(inputs, expecteds)
@@ -680,6 +733,92 @@ mod tests {
                 })),
             })),
         ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_if_stmt() {
+        let inputs = ["if 1 { 3; };"];
+        let expecteds = [Stmt::If(IfStmt {
+            condition: Expr::Literal(Literal::Integer(1)),
+            true_block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            else_block: None,
+            elifs: Vec::new(),
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_if_else_stmt() {
+        let inputs = ["if 1 { 3; } else { 4; };"];
+        let expecteds = [Stmt::If(IfStmt {
+            condition: Expr::Literal(Literal::Integer(1)),
+            true_block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            else_block: Some(Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(4)))])),
+            elifs: Vec::new(),
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_if_elif_stmt() {
+        let inputs = ["if 1 { 3; } elif True { 4; };"];
+        let expecteds = [Stmt::If(IfStmt {
+            condition: Expr::Literal(Literal::Integer(1)),
+            true_block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            else_block: None,
+            elifs: vec![ElifStmt {
+                condition: Expr::Literal(Literal::Boolean(true)),
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(4)))]),
+            }],
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_if_elif_stmt_with_multiple_elifs() {
+        let inputs = ["if 1 { 3; } elif True { 4; } elif False { 5; };"];
+        let expecteds = [Stmt::If(IfStmt {
+            condition: Expr::Literal(Literal::Integer(1)),
+            true_block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            else_block: None,
+            elifs: vec![
+                ElifStmt {
+                    condition: Expr::Literal(Literal::Boolean(true)),
+                    block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(4)))]),
+                },
+                ElifStmt {
+                    condition: Expr::Literal(Literal::Boolean(false)),
+                    block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(5)))]),
+                },
+            ],
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_if_elif_stmt_with_multiple_elifs_and_else() {
+        let inputs = ["if 1 { 3; } elif True { 4; } elif False { 5; } else { 4; };"];
+        let expecteds = [Stmt::If(IfStmt {
+            condition: Expr::Literal(Literal::Integer(1)),
+            true_block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            else_block: Some(Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(4)))])),
+            elifs: vec![
+                ElifStmt {
+                    condition: Expr::Literal(Literal::Boolean(true)),
+                    block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(4)))]),
+                },
+                ElifStmt {
+                    condition: Expr::Literal(Literal::Boolean(false)),
+                    block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(5)))]),
+                },
+            ],
+        })];
 
         test_parse!(inputs, expecteds)
     }
