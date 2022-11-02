@@ -89,10 +89,12 @@ pub struct Parser<'a> {
     errors: Vec<ParserError>,
 
     current_token: Token,
-    current_span: Range<usize>,
     peek_token: Token,
 
+    current_len: usize,
+    whitespace_len: usize,
     line: usize,
+    column: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -102,9 +104,11 @@ impl<'a> Parser<'a> {
             lexer,
             errors: Vec::new(),
             current_token: Token::EOF,
-            current_span: 0..0,
             peek_token: Token::EOF,
+            current_len: 0,
+            whitespace_len: 0,
             line: 1,
+            column: 0,
         };
 
         parser.next_token();
@@ -142,42 +146,33 @@ impl<'a> Parser<'a> {
                 range: last_line_count - 1..last_line_count,
             };
         }
-        let mut lineno = 1;
-        let mut char_index = 0;
-        let start = self.current_span.start;
-        let column = self
-            .lexer
-            .source()
-            .lines()
-            .find_map(|line| {
-                let mut col = 0;
-                for _ in 0..line.len() {
-                    if char_index == start {
-                        return Some(col);
-                    }
-                    col += 1;
-                    char_index += 1;
-                }
 
-                lineno += 1;
-                char_index += 1;
-                None
-            })
-            .expect("Current char should be in source");
         Position {
-            line: lineno,
-            range: column..column + self.current_span.len(),
+            line: self.line,
+            range: self.column - self.current_len - self.whitespace_len
+                ..self.column - self.whitespace_len,
         }
     }
 
     fn next_token(&mut self) {
         self.current_token = self.peek_token.clone();
-        self.current_span = self.lexer.span();
+        self.current_len = self.lexer.span().len();
+        self.whitespace_len = 0;
+        self.column += self.current_len;
         self.peek_token = self.lexer.next().unwrap_or(Token::EOF);
-        // Remove as many future newlines as possible
-        while self.peek_token == Token::Newline {
+        // Remove as many future newlines or whitespaces as possible
+        while self.peek_token == Token::Newline || self.peek_token == Token::HorizontalWhitespace {
+            if self.peek_token == Token::Newline {
+                self.line += 1;
+                self.column = 0;
+            } else {
+                let whitespace_len = self.lexer.span().len();
+                self.column += whitespace_len;
+                // Adds to current whitespace length so when self.position() is called, the
+                // whitespace consumed ahead of time does not factor into the position returned.
+                self.whitespace_len += whitespace_len;
+            }
             self.peek_token = self.lexer.next().unwrap_or(Token::EOF);
-            self.line += 1;
         }
     }
 

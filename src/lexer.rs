@@ -85,9 +85,10 @@ pub enum Token {
 
     #[regex(r"\n")]
     Newline,
+    #[regex(r"[ \t\f]+")]
+    HorizontalWhitespace,
 
     #[error]
-    #[regex(r"[ \t\f]+", logos::skip)]
     Error,
     #[regex("\"(?s:[^\"\\\\]|\\\\.)*")]
     ErrorUnterminatedString,
@@ -310,9 +311,14 @@ mod tests {
     }
 
     #[test]
-    fn tokenizes_bools() {
-        let mut lexer = Token::lexer("True False");
-        assert_eq!(Token::True, lexer.next().expect("Should lex something"));
+    fn tokenizes_true() {
+        let mut lexer = Token::lexer("True");
+        assert_eq!(Token::True, lexer.next().expect("Should lex something"))
+    }
+
+    #[test]
+    fn tokenizes_false() {
+        let mut lexer = Token::lexer("False");
         assert_eq!(Token::False, lexer.next().expect("Should lex something"))
     }
 
