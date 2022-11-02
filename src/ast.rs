@@ -58,8 +58,14 @@ impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Integer(i) => write!(f, "{i}"),
-            Self::Boolean(b) => write!(f, "{b}"),
-            Self::String(s) => write!(f, "{s}"),
+            Self::Boolean(b) => write!(f, "{}", {
+                if *b {
+                    "True"
+                } else {
+                    "False"
+                }
+            }),
+            Self::String(s) => write!(f, "\"{s}\""),
         }
     }
 }
@@ -211,14 +217,14 @@ pub struct IfStmt {
 
 impl fmt::Display for IfStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = String::from(format!("if {} {{{}}}", self.condition, self.true_block));
+        let mut s = String::from(format!("if {} {{ {} }}", self.condition, self.true_block));
         for elif in &self.elifs {
             s.push_str(&format!(" {elif}"));
         }
         if let Some(else_block) = &self.else_block {
             s.push_str(&format!(" else {{ {} }}", else_block))
         }
-        write!(f, "{s};")
+        write!(f, "{s}")
     }
 }
 
@@ -248,16 +254,151 @@ impl fmt::Display for Block {
         let joined = self
             .0
             .iter()
-            .map(|stmt| stmt.to_string() + " ")
+            .map(|stmt| stmt.to_string() + "; ")
             .collect::<String>();
         write!(
             f,
             "{}",
-            joined
-                .strip_suffix(", ")
-                .expect("Should have trailing ', '")
+            joined.strip_suffix(" ").expect("Should have trailing ' '")
         )
     }
 }
 
 pub type Program = Block;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    macro_rules! test_to_string {
+        ($inputs:expr, $expecteds:expr) => {
+            for (input, expected) in $inputs.iter().zip($expecteds) {
+                assert_eq!(input.to_string(), expected);
+            }
+        };
+    }
+
+    #[test]
+    fn literal_display() {
+        let inputs = [
+            Literal::Integer(3),
+            Literal::Boolean(true),
+            Literal::String("test".to_owned()),
+        ];
+        let expecteds = ["3", "True", "\"test\""];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn infix_expr_display() {
+        let inputs = [
+            InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(3))),
+                op: InfixOp::Plus,
+                right: Box::new(Expr::Literal(Literal::Integer(3))),
+                line: 1,
+            },
+            InfixExpr {
+                left: Box::new(Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(3))),
+                    op: InfixOp::Gt,
+                    right: Box::new(Expr::Literal(Literal::Integer(5))),
+                    line: 1,
+                })),
+                op: InfixOp::Plus,
+                right: Box::new(Expr::Literal(Literal::Integer(3))),
+                line: 1,
+            },
+        ];
+        let expecteds = ["(3 + 3)", "((3 > 5) + 3)"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn prefix_expr_display() {
+        let inputs = [
+            PrefixExpr {
+                left: Box::new(Expr::Literal(Literal::Boolean(true))),
+                op: PrefixOp::Bang,
+                line: 1,
+            },
+            PrefixExpr {
+                left: Box::new(Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(3))),
+                    op: InfixOp::LogicalOr,
+                    right: Box::new(Expr::Literal(Literal::Integer(4))),
+                    line: 1,
+                })),
+                op: PrefixOp::Minus,
+                line: 1,
+            },
+        ];
+        let expecteds = ["(!True)", "(-(3 || 4))"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn assign_stmt_display() {
+        let inputs = [AssignStmt {
+            name: Ident("x".to_owned()),
+            value: Expr::Literal(Literal::Integer(3)),
+            line: 1,
+        }];
+
+        let expecteds = ["x = 3;"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn if_stmt_display() {
+        let inputs = [
+            IfStmt {
+                condition: Expr::Literal(Literal::Integer(3)),
+                true_block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
+                else_block: Some(Block(vec![Stmt::Expr(Expr::Literal(Literal::String(
+                    "test".to_owned(),
+                )))])),
+                elifs: vec![ElifStmt {
+                    condition: Expr::Literal(Literal::Boolean(false)),
+                    block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(4)))]),
+                }],
+            },
+            IfStmt {
+                condition: Expr::Literal(Literal::Integer(3)),
+                true_block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
+                else_block: Some(Block(vec![Stmt::Expr(Expr::Literal(Literal::String(
+                    "test".to_owned(),
+                )))])),
+                elifs: Vec::new(),
+            },
+            IfStmt {
+                condition: Expr::Literal(Literal::Integer(3)),
+                true_block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
+                else_block: None,
+                elifs: Vec::new(),
+            },
+        ];
+        let expecteds = [
+            "if 3 { True; } elif False { 4; } else { \"test\"; }",
+            "if 3 { True; } else { \"test\"; }",
+            "if 3 { True; }",
+        ];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn return_stmt_display() {
+        let inputs = [ReturnStmt {
+            value: Expr::Literal(Literal::Integer(3)),
+            line: 1,
+        }];
+        let expecteds = ["return 3;"];
+
+        test_to_string!(inputs, expecteds)
+    }
+}
