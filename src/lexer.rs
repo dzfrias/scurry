@@ -44,6 +44,10 @@ pub enum Token {
     Ge,
     #[token("<=")]
     Le,
+    #[token("&&")]
+    LogicalAnd,
+    #[token("||")]
+    LogicalOr,
 
     #[token(",")]
     Comma,
@@ -334,6 +338,24 @@ mod tests {
     fn tokenizes_elseif() {
         let mut lexer = Token::lexer("elif");
         assert_eq!(Token::Elif, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_logical_and() {
+        let mut lexer = Token::lexer("&&");
+        assert_eq!(
+            Token::LogicalAnd,
+            lexer.next().expect("Should lex something")
+        );
+    }
+
+    #[test]
+    fn tokenizes_logical_or() {
+        let mut lexer = Token::lexer("||");
+        assert_eq!(
+            Token::LogicalOr,
+            lexer.next().expect("Should lex something")
+        );
     }
 
     #[test]

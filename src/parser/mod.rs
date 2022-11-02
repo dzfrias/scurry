@@ -54,9 +54,10 @@ pub enum ParserError {
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
-#[allow(dead_code)]
 enum Precedence {
     Lowest,
+    And,
+    Or,
     Equals,
     LessGreater,
     Sum,
@@ -71,6 +72,8 @@ impl From<&Token> for Precedence {
         match token {
             Token::Eq | Token::NotEq => Precedence::Equals,
             Token::Lt | Token::Gt | Token::Le | Token::Ge => Precedence::LessGreater,
+            Token::LogicalAnd => Precedence::And,
+            Token::LogicalOr => Precedence::Or,
             Token::Plus | Token::Minus => Precedence::Sum,
             Token::Slash | Token::Asterisk | Token::Percent => Precedence::Product,
             Token::Lparen => Precedence::Call,
@@ -272,12 +275,14 @@ impl<'a> Parser<'a> {
                 | Token::Gt
                 | Token::Ge
                 | Token::Le
+                | Token::LogicalAnd
+                | Token::LogicalOr
                 | Token::Percent => {
                     self.next_token();
                     Expr::Infix(self.parse_infix_expr(left_exp)?)
                 }
                 _ => return Some(left_exp),
-            }
+            };
         }
         Some(left_exp)
     }
@@ -302,8 +307,9 @@ impl<'a> Parser<'a> {
 
     fn parse_infix_expr(&mut self, left: Expr) -> Option<InfixExpr> {
         let infix_op = InfixOp::try_from(&self.current_token).ok()?;
+        let precedence = self.current_prec();
         self.next_token();
-        let right = self.parse_expr(self.current_prec())?;
+        let right = self.parse_expr(precedence)?;
         Some(InfixExpr {
             left: Box::new(left),
             op: infix_op,
@@ -637,7 +643,16 @@ mod tests {
     #[test]
     fn parse_basic_binary_operators() {
         let inputs = [
-            "3 + 3;", "4 / 5;", "2 * 2;", "4 - 4;", "20 % 2;", "3 == 3;", "6 >= 3;", "8 != 8;",
+            "3 + 3;",
+            "4 / 5;",
+            "2 * 2;",
+            "4 - 4;",
+            "20 % 2;",
+            "3 == 3;",
+            "6 >= 3;",
+            "8 != 8;",
+            "9 && 9;",
+            "10 || 10;",
         ];
         let expecteds = [
             Stmt::Expr(Expr::Infix(InfixExpr {
@@ -688,6 +703,18 @@ mod tests {
                 right: Box::new(Expr::Literal(Literal::Integer(8))),
                 line: 1,
             })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(9))),
+                op: InfixOp::LogicalAnd,
+                right: Box::new(Expr::Literal(Literal::Integer(9))),
+                line: 1,
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(10))),
+                op: InfixOp::LogicalOr,
+                right: Box::new(Expr::Literal(Literal::Integer(10))),
+                line: 1,
+            })),
         ];
 
         test_parse!(inputs, expecteds)
@@ -719,7 +746,14 @@ mod tests {
 
     #[test]
     fn operator_precedence() {
-        let inputs = ["-1 + 4;", "4 - 4 * 3;", "(3 + 3) * 4;", "-1 + -1;"];
+        let inputs = [
+            "-1 + 4;",
+            "4 - 4 * 3;",
+            "(3 + 3) * 4;",
+            "-1 + -1;",
+            "3 == 3 + 3;",
+            "4 == 4 && True;",
+        ];
         let expecteds = [
             Stmt::Expr(Expr::Infix(InfixExpr {
                 left: Box::new(Expr::Prefix(PrefixExpr {
@@ -765,6 +799,28 @@ mod tests {
                     op: PrefixOp::Minus,
                     line: 1,
                 })),
+                line: 1,
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(3))),
+                op: InfixOp::Eq,
+                right: Box::new(Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(3))),
+                    op: InfixOp::Plus,
+                    right: Box::new(Expr::Literal(Literal::Integer(3))),
+                    line: 1,
+                })),
+                line: 1,
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(4))),
+                    op: InfixOp::Eq,
+                    right: Box::new(Expr::Literal(Literal::Integer(4))),
+                    line: 1,
+                })),
+                op: InfixOp::LogicalAnd,
+                right: Box::new(Expr::Literal(Literal::Boolean(true))),
                 line: 1,
             })),
         ];

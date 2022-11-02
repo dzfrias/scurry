@@ -77,6 +77,8 @@ pub enum InfixOp {
     Ge,
     Le,
     Modulo,
+    LogicalAnd,
+    LogicalOr,
 }
 
 impl TryFrom<&Token> for InfixOp {
@@ -95,6 +97,8 @@ impl TryFrom<&Token> for InfixOp {
             Token::Ge => Self::Ge,
             Token::Le => Self::Le,
             Token::Percent => Self::Modulo,
+            Token::LogicalAnd => Self::LogicalAnd,
+            Token::LogicalOr => Self::LogicalOr,
             _ => return Err(format!("Invalid infix operator token: {:?}", token)),
         })
     }
@@ -114,6 +118,8 @@ impl fmt::Display for InfixOp {
             InfixOp::Ge => write!(f, ">="),
             InfixOp::Le => write!(f, "<="),
             InfixOp::Modulo => write!(f, "%"),
+            InfixOp::LogicalOr => write!(f, "||"),
+            InfixOp::LogicalAnd => write!(f, "&&"),
         }
     }
 }
