@@ -56,8 +56,8 @@ pub enum ParserError {
 #[derive(Debug, PartialEq, PartialOrd)]
 enum Precedence {
     Lowest,
-    And,
     Or,
+    And,
     Equals,
     LessGreater,
     Sum,
@@ -748,6 +748,7 @@ mod tests {
             "-1 + -1;",
             "3 == 3 + 3;",
             "4 == 4 && True;",
+            "3 && 3 || 3;",
         ];
         let expecteds = [
             Stmt::Expr(Expr::Infix(InfixExpr {
@@ -816,6 +817,17 @@ mod tests {
                 })),
                 op: InfixOp::LogicalAnd,
                 right: Box::new(Expr::Literal(Literal::Boolean(true))),
+                line: 1,
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(3))),
+                    op: InfixOp::LogicalAnd,
+                    right: Box::new(Expr::Literal(Literal::Integer(3))),
+                    line: 1,
+                })),
+                op: InfixOp::LogicalOr,
+                right: Box::new(Expr::Literal(Literal::Integer(3))),
                 line: 1,
             })),
         ];
