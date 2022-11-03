@@ -320,15 +320,16 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_dot_expr(&mut self, left_exp: Expr) -> Option<DotExpr> {
-        if !matches!(self.peek_token, Token::Ident(..)) {
+        self.next_token();
+        let ident = if let Token::Ident(ident) = &self.current_token {
+            Ident(ident.to_owned())
+        } else {
             self.errors.push(ParserError::ExpectedToken {
                 pos: self.position(),
-                token: Token::Ident("".to_string()),
+                token: Token::Ident("".to_owned()),
             });
             return None;
-        }
-        self.next_token();
-        let ident = self.parse_ident().expect("Token should be ident");
+        };
         Some(DotExpr {
             left: Box::new(left_exp),
             field: ident,
