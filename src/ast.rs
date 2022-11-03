@@ -66,12 +66,14 @@ pub enum Literal {
     Integer(i32),
     Boolean(bool),
     String(String),
+    Float(f32),
 }
 
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Integer(i) => write!(f, "{i}"),
+            Self::Float(float) => write!(f, "{float}"),
             Self::Boolean(b) => write!(f, "{}", {
                 if *b {
                     "True"

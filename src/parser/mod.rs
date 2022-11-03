@@ -224,6 +224,7 @@ impl<'a> Parser<'a> {
     fn parse_expr(&mut self, precedence: Precedence) -> Option<Expr> {
         let mut left_exp = match self.current_token {
             Token::Integer(i) => Expr::Literal(Literal::Integer(i)),
+            Token::Float(f) => Expr::Literal(Literal::Float(f)),
             Token::True => Expr::Literal(Literal::Boolean(true)),
             Token::False => Expr::Literal(Literal::Boolean(false)),
             Token::String(ref s) => Expr::Literal(Literal::String(s.to_owned())),
@@ -1015,4 +1016,6 @@ mod tests {
 
         test_parse!(inputs, expecteds)
     }
+
+    // TODO: Tests for literals
 }
