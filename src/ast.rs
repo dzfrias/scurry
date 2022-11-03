@@ -186,6 +186,8 @@ pub enum Stmt {
     If(IfStmt),
     For(ForStmt),
     While(WhileStmt),
+    Break,
+    Continue,
     Expr(Expr),
 }
 
@@ -197,6 +199,8 @@ impl fmt::Display for Stmt {
             Self::If(stmt) => write!(f, "{stmt}"),
             Self::For(stmt) => write!(f, "{stmt}"),
             Self::While(stmt) => write!(f, "{stmt}"),
+            Self::Break => write!(f, "break;"),
+            Self::Continue => write!(f, "continue;"),
             Self::Expr(expr) => write!(f, "{expr}"),
         }
     }

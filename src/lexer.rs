@@ -85,6 +85,10 @@ pub enum Token {
     In,
     #[token("while")]
     While,
+    #[token("break")]
+    Break,
+    #[token("continue")]
+    Continue,
 
     // Not explicitly tokenized, used in parser
     EOF,
@@ -386,6 +390,18 @@ mod tests {
             Token::LogicalOr,
             lexer.next().expect("Should lex something")
         );
+    }
+
+    #[test]
+    fn tokenizes_break() {
+        let mut lexer = Token::lexer("break");
+        assert_eq!(Token::Break, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_continue() {
+        let mut lexer = Token::lexer("continue");
+        assert_eq!(Token::Continue, lexer.next().expect("Should lex something"));
     }
 
     #[test]

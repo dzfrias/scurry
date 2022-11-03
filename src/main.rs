@@ -52,6 +52,9 @@ fn start_repl() -> Result<()> {
                                 ParserError::InvalidPrefixOperator { pos, .. } => {
                                     println!("{}", format_position(&line, pos));
                                 }
+                                ParserError::InvalidKeywordInScope { pos, .. } => {
+                                    println!("{}", format_position(&line, pos));
+                                }
                             }
                             println!("{s}");
                         }

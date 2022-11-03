@@ -51,6 +51,17 @@ pub enum ParserError {
 
     #[error("illegal ident, cannot have number in front: `{:?}` on {pos}", ident)]
     InvalidIdent { ident: String, pos: Position },
+
+    #[error(
+        "invalid token `{:?}` at {pos}, must be used in a `{}` scope",
+        token,
+        expect_scope
+    )]
+    InvalidKeywordInScope {
+        token: Token,
+        expect_scope: ScopeType,
+        pos: Position,
+    },
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -83,6 +94,21 @@ impl From<&Token> for Precedence {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ScopeType {
+    Function,
+    Loop,
+}
+
+impl fmt::Display for ScopeType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Function => write!(f, "function"),
+            Self::Loop => write!(f, "loop"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Parser<'a> {
     lexer: Lexer<'a, Token>,
@@ -90,6 +116,8 @@ pub struct Parser<'a> {
 
     current_token: Token,
     peek_token: Token,
+
+    scope_stack: Vec<ScopeType>,
 
     current_len: usize,
     whitespace_len: usize,
@@ -103,8 +131,11 @@ impl<'a> Parser<'a> {
         let mut parser = Self {
             lexer,
             errors: Vec::new(),
+
             current_token: Token::EOF,
             peek_token: Token::EOF,
+            scope_stack: Vec::new(),
+
             current_len: 0,
             whitespace_len: 0,
             line: 1,
@@ -206,6 +237,14 @@ impl<'a> Parser<'a> {
             Token::If => Stmt::If(self.parse_if_stmt()?),
             Token::For => Stmt::For(self.parse_for_stmt()?),
             Token::While => Stmt::While(self.parse_while_stmt()?),
+            Token::Break => {
+                self.validate_current_scope(ScopeType::Loop)?;
+                Stmt::Break
+            }
+            Token::Continue => {
+                self.validate_current_scope(ScopeType::Loop)?;
+                Stmt::Continue
+            }
 
             // Expression on one line
             _ => Stmt::Expr(self.parse_expr_stmt()?),
@@ -437,7 +476,9 @@ impl<'a> Parser<'a> {
         self.next_token();
         let expr = self.parse_expr(Precedence::Lowest)?;
         self.expect_peek(Token::Lbrace)?;
+        self.scope_stack.push(ScopeType::Loop);
         let block = self.parse_block()?;
+        self.scope_stack.pop().expect("Should have scope on stack");
         Some(ForStmt {
             iter_ident: ident,
             expr,
@@ -449,8 +490,23 @@ impl<'a> Parser<'a> {
         self.next_token();
         let condition = self.parse_expr(Precedence::Lowest)?;
         self.expect_peek(Token::Lbrace)?;
+        self.scope_stack.push(ScopeType::Loop);
         let block = self.parse_block()?;
+        self.scope_stack.pop().expect("Should have scope on stack");
         Some(WhileStmt { condition, block })
+    }
+
+    fn validate_current_scope(&mut self, expect_scope: ScopeType) -> Option<&ScopeType> {
+        if let Some(scope) = self.scope_stack.last() {
+            Some(scope)
+        } else {
+            self.errors.push(ParserError::InvalidKeywordInScope {
+                token: self.current_token.clone(),
+                expect_scope,
+                pos: self.position(),
+            });
+            None
+        }
     }
 }
 
@@ -1108,5 +1164,61 @@ mod tests {
         ];
 
         test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_continue_and_break_stmt() {
+        let inputs = [
+            "for i in x { continue; }",
+            "for i in x { break; }",
+            "while True { continue; }",
+            "while False { break; }",
+        ];
+        let expecteds = [
+            Stmt::For(ForStmt {
+                iter_ident: Ident("i".to_owned()),
+                expr: Expr::Ident(Ident("x".to_owned())),
+                block: Block(vec![Stmt::Continue]),
+            }),
+            Stmt::For(ForStmt {
+                iter_ident: Ident("i".to_owned()),
+                expr: Expr::Ident(Ident("x".to_owned())),
+                block: Block(vec![Stmt::Break]),
+            }),
+            Stmt::While(WhileStmt {
+                condition: Expr::Literal(Literal::Boolean(true)),
+                block: Block(vec![Stmt::Continue]),
+            }),
+            Stmt::While(WhileStmt {
+                condition: Expr::Literal(Literal::Boolean(false)),
+                block: Block(vec![Stmt::Break]),
+            }),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn continue_and_break_can_only_be_used_in_loops() {
+        let inputs = ["continue;", "break;"];
+        let errs = [
+            ParserError::InvalidKeywordInScope {
+                token: Token::Continue,
+                expect_scope: ScopeType::Loop,
+                pos: Position {
+                    line: 1,
+                    range: 0..8,
+                },
+            },
+            ParserError::InvalidKeywordInScope {
+                token: Token::Break,
+                expect_scope: ScopeType::Loop,
+                pos: Position {
+                    line: 1,
+                    range: 0..5,
+                },
+            },
+        ];
+        test_parse_errs!(inputs, errs)
     }
 }
