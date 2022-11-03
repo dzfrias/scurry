@@ -185,6 +185,7 @@ pub enum Stmt {
     Return(ReturnStmt),
     If(IfStmt),
     For(ForStmt),
+    While(WhileStmt),
     Expr(Expr),
 }
 
@@ -195,6 +196,7 @@ impl fmt::Display for Stmt {
             Self::Return(stmt) => write!(f, "{stmt}"),
             Self::If(stmt) => write!(f, "{stmt}"),
             Self::For(stmt) => write!(f, "{stmt}"),
+            Self::While(stmt) => write!(f, "{stmt}"),
             Self::Expr(expr) => write!(f, "{expr}"),
         }
     }
@@ -247,6 +249,18 @@ impl fmt::Display for IfStmt {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct ElifStmt {
+    pub condition: Expr,
+    pub block: Block,
+}
+
+impl fmt::Display for ElifStmt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "elif {} {{ {} }}", self.condition, self.block)
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct ForStmt {
     pub iter_ident: Ident,
     pub expr: Expr,
@@ -264,14 +278,14 @@ impl fmt::Display for ForStmt {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ElifStmt {
+pub struct WhileStmt {
     pub condition: Expr,
     pub block: Block,
 }
 
-impl fmt::Display for ElifStmt {
+impl fmt::Display for WhileStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "elif {} {{ {} }}", self.condition, self.block)
+        write!(f, "while {} {{ {} }}", self.condition, self.block)
     }
 }
 
@@ -444,6 +458,31 @@ mod tests {
             field: Ident("test".to_owned()),
         }];
         let expecteds = ["1.test"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn for_stmt_display() {
+        let inputs = [ForStmt {
+            iter_ident: Ident("i".to_owned()),
+            expr: Expr::Literal(Literal::Integer(3)),
+            block: Block(vec![Stmt::Expr(Expr::Ident(Ident("i".to_owned())))]),
+        }];
+        let expecteds = ["for i in 3 { i; }"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn while_stmt_display() {
+        let inputs = [WhileStmt {
+            condition: Expr::Literal(Literal::Boolean(true)),
+            block: Block(vec![Stmt::Expr(Expr::Literal(Literal::String(
+                "test".to_owned(),
+            )))]),
+        }];
+        let expecteds = ["while True { \"test\"; }"];
 
         test_to_string!(inputs, expecteds)
     }

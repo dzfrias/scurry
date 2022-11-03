@@ -83,6 +83,8 @@ pub enum Token {
     For,
     #[token("in")]
     In,
+    #[token("while")]
+    While,
 
     // Not explicitly tokenized, used in parser
     EOF,
@@ -360,6 +362,12 @@ mod tests {
     fn tokenizes_in() {
         let mut lexer = Token::lexer("in");
         assert_eq!(Token::In, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_while() {
+        let mut lexer = Token::lexer("while");
+        assert_eq!(Token::While, lexer.next().expect("Should lex something"));
     }
 
     #[test]

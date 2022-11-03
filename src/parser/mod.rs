@@ -205,6 +205,7 @@ impl<'a> Parser<'a> {
             Token::Return => Stmt::Return(self.parse_return_stmt()?),
             Token::If => Stmt::If(self.parse_if_stmt()?),
             Token::For => Stmt::For(self.parse_for_stmt()?),
+            Token::While => Stmt::While(self.parse_while_stmt()?),
 
             // Expression on one line
             _ => Stmt::Expr(self.parse_expr_stmt()?),
@@ -442,6 +443,14 @@ impl<'a> Parser<'a> {
             expr,
             block,
         })
+    }
+
+    fn parse_while_stmt(&mut self) -> Option<WhileStmt> {
+        self.next_token();
+        let condition = self.parse_expr(Precedence::Lowest)?;
+        self.expect_peek(Token::Lbrace)?;
+        let block = self.parse_block()?;
+        Some(WhileStmt { condition, block })
     }
 }
 
@@ -1073,6 +1082,28 @@ mod tests {
                     line: 1,
                 }),
                 block: Block(vec![Stmt::Expr(Expr::Ident(Ident("ident".to_owned())))]),
+            }),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_while_stmt() {
+        let inputs = ["while True { 3; }", "while 3 == 3 { x; }"];
+        let expecteds = [
+            Stmt::While(WhileStmt {
+                condition: Expr::Literal(Literal::Boolean(true)),
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            }),
+            Stmt::While(WhileStmt {
+                condition: Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(3))),
+                    op: InfixOp::Eq,
+                    right: Box::new(Expr::Literal(Literal::Integer(3))),
+                    line: 1,
+                }),
+                block: Block(vec![Stmt::Expr(Expr::Ident(Ident("x".to_owned())))]),
             }),
         ];
 
