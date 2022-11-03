@@ -94,7 +94,7 @@ impl From<&Token> for Precedence {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ScopeType {
     Function,
     Loop,
@@ -237,7 +237,7 @@ impl<'a> Parser<'a> {
                 Stmt::Function(self.parse_function_stmt()?)
             }
             Token::Return => {
-                self.validate_current_scope(ScopeType::Function)?;
+                self.scopes_contain(ScopeType::Function)?;
                 Stmt::Return(self.parse_return_stmt()?)
             }
             Token::If => Stmt::If(self.parse_if_stmt()?),
@@ -412,9 +412,23 @@ impl<'a> Parser<'a> {
         Some(statements)
     }
 
-    fn validate_current_scope(&mut self, expect_scope: ScopeType) -> Option<&ScopeType> {
+    fn validate_current_scope(&mut self, expect_scope: ScopeType) -> Option<ScopeType> {
         if let Some(scope) = self.scope_stack.last() {
-            Some(scope)
+            if scope == &expect_scope {
+                return Some(expect_scope.clone());
+            }
+        }
+        self.errors.push(ParserError::InvalidKeywordInScope {
+            token: self.current_token.clone(),
+            expect_scope,
+            pos: self.position(),
+        });
+        None
+    }
+
+    fn scopes_contain(&mut self, expect_scope: ScopeType) -> Option<ScopeType> {
+        if self.scope_stack.contains(&expect_scope) {
+            return Some(expect_scope);
         } else {
             self.errors.push(ParserError::InvalidKeywordInScope {
                 token: self.current_token.clone(),
@@ -1319,5 +1333,23 @@ mod tests {
         }];
 
         test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn can_return_from_loop_in_function() {
+        let inputs = ["fn(x) { for i in x { return i; } }"];
+        let expecteds = [Stmt::Expr(Expr::Function(FunctionExpr {
+            params: vec![Ident("x".to_owned())],
+            block: Block(vec![Stmt::For(ForStmt {
+                iter_ident: Ident("i".to_owned()),
+                expr: Expr::Ident(Ident("x".to_owned())),
+                block: Block(vec![Stmt::Return(ReturnStmt {
+                    value: Expr::Ident(Ident("i".to_owned())),
+                    line: 1,
+                })]),
+            })]),
+        }))];
+
+        test_parse!(inputs, expecteds)
     }
 }
