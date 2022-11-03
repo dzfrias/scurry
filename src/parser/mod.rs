@@ -233,7 +233,13 @@ impl<'a> Parser<'a> {
             Token::Ident(_) if self.peek_token == Token::Assign => {
                 Stmt::Assign(self.parse_assign_stmt()?)
             }
-            Token::Return => Stmt::Return(self.parse_return_stmt()?),
+            Token::Function if matches!(self.peek_token, Token::Ident(..)) => {
+                Stmt::Function(self.parse_function_stmt()?)
+            }
+            Token::Return => {
+                self.validate_current_scope(ScopeType::Function)?;
+                Stmt::Return(self.parse_return_stmt()?)
+            }
             Token::If => Stmt::If(self.parse_if_stmt()?),
             Token::For => Stmt::For(self.parse_for_stmt()?),
             Token::While => Stmt::While(self.parse_while_stmt()?),
@@ -271,6 +277,7 @@ impl<'a> Parser<'a> {
             Token::String(ref s) => Expr::Literal(Literal::String(s.to_owned())),
             Token::Ident(_) => Expr::Ident(self.parse_ident().expect("Should be on ident")),
             Token::Bang | Token::Minus | Token::Plus => Expr::Prefix(self.parse_prefix_expr()?),
+            Token::Function => Expr::Function(self.parse_function_expr()?),
             Token::Lparen => self.parse_grouped_expr()?,
             Token::Error => {
                 self.errors.push(ParserError::IllegalCharacter {
@@ -328,10 +335,14 @@ impl<'a> Parser<'a> {
         Some(left_exp)
     }
 
-    fn parse_ident(&self) -> Option<Ident> {
-        if let Token::Ident(name) = &self.current_token {
-            Some(Ident(name.to_owned()))
+    fn parse_ident(&mut self) -> Option<Ident> {
+        if let Token::Ident(ident) = &self.current_token {
+            Some(Ident(ident.to_owned()))
         } else {
+            self.errors.push(ParserError::ExpectedToken {
+                pos: self.position(),
+                token: Token::Ident("".to_owned()),
+            });
             None
         }
     }
@@ -361,15 +372,7 @@ impl<'a> Parser<'a> {
 
     fn parse_dot_expr(&mut self, left_exp: Expr) -> Option<DotExpr> {
         self.next_token();
-        let ident = if let Token::Ident(ident) = &self.current_token {
-            Ident(ident.to_owned())
-        } else {
-            self.errors.push(ParserError::ExpectedToken {
-                pos: self.position(),
-                token: Token::Ident("".to_owned()),
-            });
-            return None;
-        };
+        let ident = self.parse_ident()?;
         Some(DotExpr {
             left: Box::new(left_exp),
             field: ident,
@@ -387,6 +390,16 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn parse_function_expr(&mut self) -> Option<FunctionExpr> {
+        self.expect_peek(Token::Lparen)?;
+        let params = self.parse_function_params()?;
+        self.expect_peek(Token::Lbrace)?;
+        self.scope_stack.push(ScopeType::Function);
+        let block = self.parse_block()?;
+        self.scope_stack.pop().expect("Should have scope on stack");
+        Some(FunctionExpr { params, block })
+    }
+
     fn parse_block(&mut self) -> Option<Block> {
         let mut statements = Block(Vec::new());
         self.next_token();
@@ -399,6 +412,19 @@ impl<'a> Parser<'a> {
         Some(statements)
     }
 
+    fn validate_current_scope(&mut self, expect_scope: ScopeType) -> Option<&ScopeType> {
+        if let Some(scope) = self.scope_stack.last() {
+            Some(scope)
+        } else {
+            self.errors.push(ParserError::InvalidKeywordInScope {
+                token: self.current_token.clone(),
+                expect_scope,
+                pos: self.position(),
+            });
+            None
+        }
+    }
+
     fn parse_return_stmt(&mut self) -> Option<ReturnStmt> {
         self.next_token();
         let return_val = self.parse_expr(Precedence::Lowest)?;
@@ -409,15 +435,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_assign_stmt(&mut self) -> Option<AssignStmt> {
-        let ident = if let Token::Ident(ident) = &self.current_token {
-            Ident(ident.to_owned())
-        } else {
-            self.errors.push(ParserError::ExpectedToken {
-                pos: self.position(),
-                token: Token::Ident("".to_owned()),
-            });
-            return None;
-        };
+        let ident = self.parse_ident()?;
         self.expect_peek(Token::Assign)?;
         self.next_token();
         let value = self.parse_expr(Precedence::Lowest)?;
@@ -463,15 +481,7 @@ impl<'a> Parser<'a> {
 
     fn parse_for_stmt(&mut self) -> Option<ForStmt> {
         self.next_token();
-        let ident = if let Token::Ident(ident) = &self.current_token {
-            Ident(ident.to_owned())
-        } else {
-            self.errors.push(ParserError::ExpectedToken {
-                pos: self.position(),
-                token: Token::Ident("".to_owned()),
-            });
-            return None;
-        };
+        let ident = self.parse_ident()?;
         self.expect_peek(Token::In)?;
         self.next_token();
         let expr = self.parse_expr(Precedence::Lowest)?;
@@ -496,17 +506,42 @@ impl<'a> Parser<'a> {
         Some(WhileStmt { condition, block })
     }
 
-    fn validate_current_scope(&mut self, expect_scope: ScopeType) -> Option<&ScopeType> {
-        if let Some(scope) = self.scope_stack.last() {
-            Some(scope)
-        } else {
-            self.errors.push(ParserError::InvalidKeywordInScope {
-                token: self.current_token.clone(),
-                expect_scope,
-                pos: self.position(),
-            });
-            None
+    fn parse_function_stmt(&mut self) -> Option<FunctionStmt> {
+        self.next_token();
+        let name = self.parse_ident()?;
+        self.expect_peek(Token::Lparen)?;
+        let params = self.parse_function_params()?;
+        self.expect_peek(Token::Lbrace)?;
+        self.scope_stack.push(ScopeType::Function);
+        let block = self.parse_block()?;
+        self.scope_stack.pop().expect("Should have scope on stack");
+        Some(FunctionStmt {
+            name,
+            params,
+            block,
+        })
+    }
+
+    fn parse_function_params(&mut self) -> Option<Vec<Ident>> {
+        let mut idents = Vec::new();
+        if self.peek_token == Token::Rparen {
+            self.next_token();
+            return Some(idents);
         }
+        self.next_token();
+        let ident = self.parse_ident()?;
+        idents.push(ident);
+
+        while self.peek_token == Token::Comma {
+            self.next_token();
+            self.next_token();
+            let ident = self.parse_ident()?;
+            idents.push(ident);
+        }
+
+        self.expect_peek(Token::Rparen);
+
+        Some(idents)
     }
 }
 
@@ -621,22 +656,12 @@ mod tests {
     }
 
     #[test]
-    fn parse_return_stmt() {
-        let inputs = ["return 3;"];
-        let expecteds = [Stmt::Return(ReturnStmt {
-            value: Expr::Literal(Literal::Integer(3)),
-            line: 1,
-        })];
-
-        test_parse!(inputs, expecteds)
-    }
-
-    #[test]
     fn parse_stmt_on_line_2() {
         let inputs = ["
-            return 3;
+            x = 3;
             "];
-        let expecteds = [Stmt::Return(ReturnStmt {
+        let expecteds = [Stmt::Assign(AssignStmt {
+            name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
             line: 2,
         })];
@@ -683,19 +708,12 @@ mod tests {
 
     #[test]
     fn needs_semicolon_at_end_of_statements() {
-        let inputs = ["x = 3", "return 3", "333"];
+        let inputs = ["x = 3", "333"];
         let errs = [
             ParserError::ExpectedToken {
                 pos: Position {
                     line: 1,
                     range: 4..5,
-                },
-                token: Token::Semicolon,
-            },
-            ParserError::ExpectedToken {
-                pos: Position {
-                    line: 1,
-                    range: 7..8,
                 },
                 token: Token::Semicolon,
             },
@@ -1060,12 +1078,12 @@ mod tests {
 
     #[test]
     fn errors_appear_in_expressions_nested_in_statements() {
-        let inputs = ["return \"hello", "x = #;"];
+        let inputs = ["x = \"hello", "x = #;"];
         let errs = [
             ParserError::UnteriminatedString {
                 pos: Position {
                     line: 1,
-                    range: 7..13,
+                    range: 4..10,
                 },
             },
             ParserError::IllegalCharacter {
@@ -1219,6 +1237,87 @@ mod tests {
                 },
             },
         ];
+
+        test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn parse_function_expr() {
+        let inputs = ["fn(x) { x; }", "fn(e, y) { e + y; }"];
+        let expecteds = [
+            Stmt::Expr(Expr::Function(FunctionExpr {
+                params: vec![Ident("x".to_owned())],
+                block: Block(vec![Stmt::Expr(Expr::Ident(Ident("x".to_owned())))]),
+            })),
+            Stmt::Expr(Expr::Function(FunctionExpr {
+                params: vec![Ident("e".to_owned()), Ident("y".to_owned())],
+                block: Block(vec![Stmt::Expr(Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Ident(Ident("e".to_owned()))),
+                    op: InfixOp::Plus,
+                    right: Box::new(Expr::Ident(Ident("y".to_owned()))),
+                    line: 1,
+                }))]),
+            })),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_function_stmt() {
+        let inputs = [
+            "fn test(i) { i; }",
+            "fn test2(x, y) { 1; }",
+            "fn test() { 3; }",
+        ];
+        let expecteds = [
+            Stmt::Function(FunctionStmt {
+                name: Ident("test".to_owned()),
+                params: vec![Ident("i".to_owned())],
+                block: Block(vec![Stmt::Expr(Expr::Ident(Ident("i".to_owned())))]),
+            }),
+            Stmt::Function(FunctionStmt {
+                name: Ident("test2".to_owned()),
+                params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
+            }),
+            Stmt::Function(FunctionStmt {
+                name: Ident("test".to_owned()),
+                params: Vec::new(),
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            }),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_return_stmt() {
+        let inputs = ["fn test() { return 3; }"];
+        let expecteds = [Stmt::Function(FunctionStmt {
+            name: Ident("test".to_owned()),
+            params: Vec::new(),
+            block: Block(vec![Stmt::Return(ReturnStmt {
+                value: Expr::Literal(Literal::Integer(3)),
+                line: 1,
+            })]),
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn cant_return_outside_of_function_context() {
+        let inputs = ["return 3;"];
+        let errs = [ParserError::InvalidKeywordInScope {
+            token: Token::Return,
+            expect_scope: ScopeType::Function,
+            pos: Position {
+                line: 1,
+                range: 0..6,
+            },
+        }];
+
         test_parse_errs!(inputs, errs)
     }
 }

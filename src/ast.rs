@@ -8,6 +8,7 @@ pub enum Expr {
     Infix(InfixExpr),
     Prefix(PrefixExpr),
     Dot(DotExpr),
+    Function(FunctionExpr),
 }
 
 impl fmt::Display for Expr {
@@ -17,6 +18,7 @@ impl fmt::Display for Expr {
             Self::Literal(literal) => write!(f, "{literal}"),
             Self::Infix(infix) => write!(f, "{infix}"),
             Self::Prefix(prefix) => write!(f, "{prefix}"),
+            Self::Function(function) => write!(f, "{function}"),
             Self::Dot(dotexpr) => write!(f, "{dotexpr}"),
         }
     }
@@ -58,6 +60,30 @@ pub struct DotExpr {
 impl fmt::Display for DotExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}.{}", self.left, self.field)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FunctionExpr {
+    pub params: Vec<Ident>,
+    pub block: Block,
+}
+
+impl fmt::Display for FunctionExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let joined = self
+            .params
+            .iter()
+            .map(|ident| ident.to_string() + ", ")
+            .collect::<String>();
+        write!(
+            f,
+            "fn({}) {{ {} }}",
+            joined
+                .strip_suffix(", ")
+                .expect("Should always have a trailing ', '"),
+            self.block,
+        )
     }
 }
 
@@ -182,12 +208,16 @@ pub struct Ident(pub String);
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
     Assign(AssignStmt),
-    Return(ReturnStmt),
     If(IfStmt),
+
+    Function(FunctionStmt),
+    Return(ReturnStmt),
+
     For(ForStmt),
     While(WhileStmt),
     Break,
     Continue,
+
     Expr(Expr),
 }
 
@@ -199,6 +229,7 @@ impl fmt::Display for Stmt {
             Self::If(stmt) => write!(f, "{stmt}"),
             Self::For(stmt) => write!(f, "{stmt}"),
             Self::While(stmt) => write!(f, "{stmt}"),
+            Self::Function(stmt) => write!(f, "{stmt}"),
             Self::Break => write!(f, "break;"),
             Self::Continue => write!(f, "continue;"),
             Self::Expr(expr) => write!(f, "{expr}"),
@@ -290,6 +321,32 @@ pub struct WhileStmt {
 impl fmt::Display for WhileStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "while {} {{ {} }}", self.condition, self.block)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FunctionStmt {
+    pub name: Ident,
+    pub params: Vec<Ident>,
+    pub block: Block,
+}
+
+impl fmt::Display for FunctionStmt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let joined = self
+            .params
+            .iter()
+            .map(|ident| ident.to_string() + ", ")
+            .collect::<String>();
+        write!(
+            f,
+            "fn {}({}) {{ {} }}",
+            self.name,
+            joined
+                .strip_suffix(", ")
+                .expect("Should always have a trailing ', '"),
+            self.block,
+        )
     }
 }
 
@@ -487,6 +544,42 @@ mod tests {
             )))]),
         }];
         let expecteds = ["while True { \"test\"; }"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn function_stmt_display() {
+        let inputs = [
+            FunctionStmt {
+                name: Ident("x".to_owned()),
+                params: vec![Ident("y".to_owned())],
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            },
+            FunctionStmt {
+                name: Ident("x".to_owned()),
+                params: vec![Ident("y".to_owned()), Ident("z".to_owned())],
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            },
+        ];
+        let expecteds = ["fn x(y) { 3; }", "fn x(y, z) { 3; }"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn function_expr_display() {
+        let inputs = [
+            FunctionExpr {
+                params: vec![Ident("x".to_owned())],
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
+            },
+            FunctionExpr {
+                params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
+            },
+        ];
+        let expecteds = ["fn(x) { True; }", "fn(x, y) { True; }"];
 
         test_to_string!(inputs, expecteds)
     }
