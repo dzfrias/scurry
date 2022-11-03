@@ -445,6 +445,19 @@ mod tests {
     }
 
     #[test]
+    fn parse_literal_exprs() {
+        let inputs = ["123;", "3.3;", "\"test\";", "True;"];
+        let expecteds = [
+            Stmt::Expr(Expr::Literal(Literal::Integer(123))),
+            Stmt::Expr(Expr::Literal(Literal::Float(3.3))),
+            Stmt::Expr(Expr::Literal(Literal::String("test".to_owned()))),
+            Stmt::Expr(Expr::Literal(Literal::Boolean(true))),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
     fn tracks_first_line() {
         let input = "123 456";
         let parser = Parser::new(input);
@@ -1016,6 +1029,4 @@ mod tests {
 
         test_parse!(inputs, expecteds)
     }
-
-    // TODO: Tests for literals
 }
