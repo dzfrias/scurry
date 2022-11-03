@@ -204,6 +204,7 @@ impl<'a> Parser<'a> {
             }
             Token::Return => Stmt::Return(self.parse_return_stmt()?),
             Token::If => Stmt::If(self.parse_if_stmt()?),
+            Token::For => Stmt::For(self.parse_for_stmt()?),
 
             // Expression on one line
             _ => Stmt::Expr(self.parse_expr_stmt()?),
@@ -345,6 +346,18 @@ impl<'a> Parser<'a> {
         })
     }
 
+    fn parse_block(&mut self) -> Option<Block> {
+        let mut statements = Block(Vec::new());
+        self.next_token();
+        while self.current_token != Token::Rbrace && self.current_token != Token::EOF {
+            if let Some(stmt) = self.parse_stmt() {
+                statements.0.push(stmt);
+            }
+            self.next_token();
+        }
+        Some(statements)
+    }
+
     fn parse_return_stmt(&mut self) -> Option<ReturnStmt> {
         self.next_token();
         let return_val = self.parse_expr(Precedence::Lowest)?;
@@ -407,16 +420,27 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_block(&mut self) -> Option<Block> {
-        let mut statements = Block(Vec::new());
+    fn parse_for_stmt(&mut self) -> Option<ForStmt> {
         self.next_token();
-        while self.current_token != Token::Rbrace && self.current_token != Token::EOF {
-            if let Some(stmt) = self.parse_stmt() {
-                statements.0.push(stmt);
-            }
-            self.next_token();
-        }
-        Some(statements)
+        let ident = if let Token::Ident(ident) = &self.current_token {
+            Ident(ident.to_owned())
+        } else {
+            self.errors.push(ParserError::ExpectedToken {
+                pos: self.position(),
+                token: Token::Ident("".to_owned()),
+            });
+            return None;
+        };
+        self.expect_peek(Token::In)?;
+        self.next_token();
+        let expr = self.parse_expr(Precedence::Lowest)?;
+        self.expect_peek(Token::Lbrace)?;
+        let block = self.parse_block()?;
+        Some(ForStmt {
+            iter_ident: ident,
+            expr,
+            block,
+        })
     }
 }
 
@@ -1025,6 +1049,30 @@ mod tests {
                 })),
                 field: Ident("test".to_owned()),
             })),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_for_stmt() {
+        let inputs = ["for i in 1 { i; }", "for ident in 3 + 3 { ident; }"];
+        let expecteds = [
+            Stmt::For(ForStmt {
+                iter_ident: Ident("i".to_owned()),
+                expr: Expr::Literal(Literal::Integer(1)),
+                block: Block(vec![Stmt::Expr(Expr::Ident(Ident("i".to_owned())))]),
+            }),
+            Stmt::For(ForStmt {
+                iter_ident: Ident("ident".to_owned()),
+                expr: Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(3))),
+                    op: InfixOp::Plus,
+                    right: Box::new(Expr::Literal(Literal::Integer(3))),
+                    line: 1,
+                }),
+                block: Block(vec![Stmt::Expr(Expr::Ident(Ident("ident".to_owned())))]),
+            }),
         ];
 
         test_parse!(inputs, expecteds)

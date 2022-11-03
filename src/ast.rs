@@ -184,6 +184,7 @@ pub enum Stmt {
     Assign(AssignStmt),
     Return(ReturnStmt),
     If(IfStmt),
+    For(ForStmt),
     Expr(Expr),
 }
 
@@ -193,6 +194,7 @@ impl fmt::Display for Stmt {
             Self::Assign(stmt) => write!(f, "{stmt}"),
             Self::Return(stmt) => write!(f, "{stmt}"),
             Self::If(stmt) => write!(f, "{stmt}"),
+            Self::For(stmt) => write!(f, "{stmt}"),
             Self::Expr(expr) => write!(f, "{expr}"),
         }
     }
@@ -241,6 +243,23 @@ impl fmt::Display for IfStmt {
             s.push_str(&format!(" else {{ {} }}", else_block))
         }
         write!(f, "{s}")
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ForStmt {
+    pub iter_ident: Ident,
+    pub expr: Expr,
+    pub block: Block,
+}
+
+impl fmt::Display for ForStmt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "for {} in {} {{ {} }}",
+            self.iter_ident, self.expr, self.block
+        )
     }
 }
 

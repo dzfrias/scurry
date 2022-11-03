@@ -79,6 +79,10 @@ pub enum Token {
     Elif,
     #[token("return")]
     Return,
+    #[token("for")]
+    For,
+    #[token("in")]
+    In,
 
     // Not explicitly tokenized, used in parser
     EOF,
@@ -344,6 +348,18 @@ mod tests {
     fn tokenizes_elseif() {
         let mut lexer = Token::lexer("elif");
         assert_eq!(Token::Elif, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_for() {
+        let mut lexer = Token::lexer("for");
+        assert_eq!(Token::For, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_in() {
+        let mut lexer = Token::lexer("in");
+        assert_eq!(Token::In, lexer.next().expect("Should lex something"));
     }
 
     #[test]
