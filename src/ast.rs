@@ -7,6 +7,7 @@ pub enum Expr {
     Literal(Literal),
     Infix(InfixExpr),
     Prefix(PrefixExpr),
+    Dot(DotExpr),
 }
 
 impl fmt::Display for Expr {
@@ -16,6 +17,7 @@ impl fmt::Display for Expr {
             Self::Literal(literal) => write!(f, "{literal}"),
             Self::Infix(infix) => write!(f, "{infix}"),
             Self::Prefix(prefix) => write!(f, "{prefix}"),
+            Self::Dot(dotexpr) => write!(f, "{dotexpr}"),
         }
     }
 }
@@ -44,6 +46,18 @@ pub struct PrefixExpr {
 impl fmt::Display for PrefixExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}{})", self.op, self.left)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DotExpr {
+    pub left: Box<Expr>,
+    pub field: Ident,
+}
+
+impl fmt::Display for DotExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}.{}", self.left, self.field)
     }
 }
 
@@ -398,6 +412,17 @@ mod tests {
             line: 1,
         }];
         let expecteds = ["return 3;"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn dot_expr_display() {
+        let inputs = [DotExpr {
+            left: Box::new(Expr::Literal(Literal::Integer(1))),
+            field: Ident("test".to_owned()),
+        }];
+        let expecteds = ["1.test"];
 
         test_to_string!(inputs, expecteds)
     }

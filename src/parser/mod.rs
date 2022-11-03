@@ -64,7 +64,7 @@ enum Precedence {
     Product,
     Prefix,
     Call,
-    Index,
+    IndexDot,
 }
 
 impl From<&Token> for Precedence {
@@ -77,7 +77,7 @@ impl From<&Token> for Precedence {
             Token::Plus | Token::Minus => Precedence::Sum,
             Token::Slash | Token::Asterisk | Token::Percent => Precedence::Product,
             Token::Lparen => Precedence::Call,
-            Token::Lbracket => Precedence::Index,
+            Token::Lbracket | Token::Dot => Precedence::IndexDot,
             _ => Precedence::Lowest,
         }
     }
@@ -276,6 +276,10 @@ impl<'a> Parser<'a> {
                     self.next_token();
                     Expr::Infix(self.parse_infix_expr(left_exp)?)
                 }
+                Token::Dot => {
+                    self.next_token();
+                    Expr::Dot(self.parse_dot_expr(left_exp)?)
+                }
                 _ => return Some(left_exp),
             };
         }
@@ -310,6 +314,22 @@ impl<'a> Parser<'a> {
             op: infix_op,
             right: Box::new(right),
             line: self.line,
+        })
+    }
+
+    fn parse_dot_expr(&mut self, left_exp: Expr) -> Option<DotExpr> {
+        if !matches!(self.peek_token, Token::Ident(..)) {
+            self.errors.push(ParserError::ExpectedToken {
+                pos: self.position(),
+                token: Token::Ident("".to_string()),
+            });
+            return None;
+        }
+        self.next_token();
+        let ident = self.parse_ident().expect("Token should be ident");
+        Some(DotExpr {
+            left: Box::new(left_exp),
+            field: ident,
         })
     }
 
@@ -970,6 +990,28 @@ mod tests {
             right: Box::new(Expr::Literal(Literal::Integer(3))),
             line: 2,
         }))];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_dot_expr() {
+        let inputs = ["hello.world;", "(1 + 1).test;"];
+        let expecteds = [
+            Stmt::Expr(Expr::Dot(DotExpr {
+                left: Box::new(Expr::Ident(Ident("hello".to_owned()))),
+                field: Ident("world".to_owned()),
+            })),
+            Stmt::Expr(Expr::Dot(DotExpr {
+                left: Box::new(Expr::Infix(InfixExpr {
+                    left: Box::new(Expr::Literal(Literal::Integer(1))),
+                    op: InfixOp::Plus,
+                    right: Box::new(Expr::Literal(Literal::Integer(1))),
+                    line: 1,
+                })),
+                field: Ident("test".to_owned()),
+            })),
+        ];
 
         test_parse!(inputs, expecteds)
     }
