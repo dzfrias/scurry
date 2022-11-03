@@ -376,6 +376,7 @@ impl<'a> Parser<'a> {
         Some(DotExpr {
             left: Box::new(left_exp),
             field: ident,
+            line: self.line,
         })
     }
 
@@ -442,10 +443,7 @@ impl<'a> Parser<'a> {
     fn parse_return_stmt(&mut self) -> Option<ReturnStmt> {
         self.next_token();
         let return_val = self.parse_expr(Precedence::Lowest)?;
-        Some(ReturnStmt {
-            value: return_val,
-            line: self.line,
-        })
+        Some(ReturnStmt { value: return_val })
     }
 
     fn parse_assign_stmt(&mut self) -> Option<AssignStmt> {
@@ -453,11 +451,7 @@ impl<'a> Parser<'a> {
         self.expect_peek(Token::Assign)?;
         self.next_token();
         let value = self.parse_expr(Precedence::Lowest)?;
-        Some(AssignStmt {
-            name: ident,
-            value,
-            line: self.line,
-        })
+        Some(AssignStmt { name: ident, value })
     }
 
     fn parse_if_stmt(&mut self) -> Option<IfStmt> {
@@ -650,7 +644,6 @@ mod tests {
         let expecteds = [Stmt::Assign(AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
-            line: 1,
         })];
 
         test_parse!(inputs, expecteds)
@@ -663,7 +656,6 @@ mod tests {
         let expecteds = [Stmt::Assign(AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
-            line: 2,
         })];
 
         test_parse!(inputs, expecteds)
@@ -677,7 +669,6 @@ mod tests {
         let expecteds = [Stmt::Assign(AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
-            line: 2,
         })];
 
         test_parse!(inputs, expecteds)
@@ -1137,6 +1128,7 @@ mod tests {
             Stmt::Expr(Expr::Dot(DotExpr {
                 left: Box::new(Expr::Ident(Ident("hello".to_owned()))),
                 field: Ident("world".to_owned()),
+                line: 1,
             })),
             Stmt::Expr(Expr::Dot(DotExpr {
                 left: Box::new(Expr::Infix(InfixExpr {
@@ -1146,6 +1138,7 @@ mod tests {
                     line: 1,
                 })),
                 field: Ident("test".to_owned()),
+                line: 1,
             })),
         ];
 
@@ -1313,7 +1306,6 @@ mod tests {
             params: Vec::new(),
             block: Block(vec![Stmt::Return(ReturnStmt {
                 value: Expr::Literal(Literal::Integer(3)),
-                line: 1,
             })]),
         })];
 
@@ -1345,7 +1337,6 @@ mod tests {
                 expr: Expr::Ident(Ident("x".to_owned())),
                 block: Block(vec![Stmt::Return(ReturnStmt {
                     value: Expr::Ident(Ident("i".to_owned())),
-                    line: 1,
                 })]),
             })]),
         }))];

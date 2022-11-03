@@ -55,6 +55,7 @@ impl fmt::Display for PrefixExpr {
 pub struct DotExpr {
     pub left: Box<Expr>,
     pub field: Ident,
+    pub line: usize,
 }
 
 impl fmt::Display for DotExpr {
@@ -241,7 +242,6 @@ impl fmt::Display for Stmt {
 pub struct AssignStmt {
     pub name: Ident,
     pub value: Expr,
-    pub line: usize,
 }
 
 impl fmt::Display for AssignStmt {
@@ -253,7 +253,6 @@ impl fmt::Display for AssignStmt {
 #[derive(Debug, PartialEq)]
 pub struct ReturnStmt {
     pub value: Expr,
-    pub line: usize,
 }
 
 impl fmt::Display for ReturnStmt {
@@ -455,7 +454,6 @@ mod tests {
         let inputs = [AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
-            line: 1,
         }];
 
         let expecteds = ["x = 3;"];
@@ -505,7 +503,6 @@ mod tests {
     fn return_stmt_display() {
         let inputs = [ReturnStmt {
             value: Expr::Literal(Literal::Integer(3)),
-            line: 1,
         }];
         let expecteds = ["return 3;"];
 
@@ -517,6 +514,7 @@ mod tests {
         let inputs = [DotExpr {
             left: Box::new(Expr::Literal(Literal::Integer(1))),
             field: Ident("test".to_owned()),
+            line: 1,
         }];
         let expecteds = ["1.test"];
 
