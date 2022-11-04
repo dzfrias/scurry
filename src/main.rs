@@ -40,6 +40,9 @@ fn start_repl() -> Result<()> {
                                 ParserError::ExpectedToken { pos, .. } => {
                                     println!("{}", format_position(&line, pos))
                                 }
+                                ParserError::ExpectedAnyOf { pos, .. } => {
+                                    println!("{}", format_position(&line, pos))
+                                }
                                 ParserError::InvalidIdent { pos, .. } => {
                                     println!("{}", format_position(&line, pos))
                                 }

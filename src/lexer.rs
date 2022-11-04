@@ -89,6 +89,8 @@ pub enum Token {
     Break,
     #[token("continue")]
     Continue,
+    #[token("decl")]
+    Declaration,
 
     // Not explicitly tokenized, used in parser
     EOF,
@@ -402,6 +404,15 @@ mod tests {
     fn tokenizes_continue() {
         let mut lexer = Token::lexer("continue");
         assert_eq!(Token::Continue, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_declaration() {
+        let mut lexer = Token::lexer("decl");
+        assert_eq!(
+            Token::Declaration,
+            lexer.next().expect("Should lex something")
+        );
     }
 
     #[test]

@@ -72,6 +72,9 @@ pub struct FunctionExpr {
 
 impl fmt::Display for FunctionExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.params.is_empty() {
+            return write!(f, "fn() {}", self.block);
+        }
         let joined = self
             .params
             .iter()
@@ -79,7 +82,7 @@ impl fmt::Display for FunctionExpr {
             .collect::<String>();
         write!(
             f,
-            "fn({}) {{ {} }}",
+            "fn({}) {}",
             joined
                 .strip_suffix(", ")
                 .expect("Should always have a trailing ', '"),
@@ -206,6 +209,12 @@ impl fmt::Display for PrefixOp {
 #[derive(Debug, PartialEq)]
 pub struct Ident(pub String);
 
+impl fmt::Display for Ident {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
     Assign(AssignStmt),
@@ -213,6 +222,8 @@ pub enum Stmt {
 
     Function(FunctionStmt),
     Return(ReturnStmt),
+
+    Declaration(DeclarationStmt),
 
     For(ForStmt),
     While(WhileStmt),
@@ -231,6 +242,7 @@ impl fmt::Display for Stmt {
             Self::For(stmt) => write!(f, "{stmt}"),
             Self::While(stmt) => write!(f, "{stmt}"),
             Self::Function(stmt) => write!(f, "{stmt}"),
+            Self::Declaration(_) => todo!(),
             Self::Break => write!(f, "break;"),
             Self::Continue => write!(f, "continue;"),
             Self::Expr(expr) => write!(f, "{expr}"),
@@ -271,12 +283,12 @@ pub struct IfStmt {
 
 impl fmt::Display for IfStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = String::from(format!("if {} {{ {} }}", self.condition, self.true_block));
+        let mut s = String::from(format!("if {} {}", self.condition, self.true_block));
         for elif in &self.elifs {
             s.push_str(&format!(" {elif}"));
         }
         if let Some(else_block) = &self.else_block {
-            s.push_str(&format!(" else {{ {} }}", else_block))
+            s.push_str(&format!(" else {}", else_block))
         }
         write!(f, "{s}")
     }
@@ -290,7 +302,7 @@ pub struct ElifStmt {
 
 impl fmt::Display for ElifStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "elif {} {{ {} }}", self.condition, self.block)
+        write!(f, "elif {} {}", self.condition, self.block)
     }
 }
 
@@ -303,11 +315,7 @@ pub struct ForStmt {
 
 impl fmt::Display for ForStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "for {} in {} {{ {} }}",
-            self.iter_ident, self.expr, self.block
-        )
+        write!(f, "for {} in {} {}", self.iter_ident, self.expr, self.block)
     }
 }
 
@@ -319,7 +327,7 @@ pub struct WhileStmt {
 
 impl fmt::Display for WhileStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "while {} {{ {} }}", self.condition, self.block)
+        write!(f, "while {} {}", self.condition, self.block)
     }
 }
 
@@ -339,19 +347,63 @@ impl fmt::Display for FunctionStmt {
             .collect::<String>();
         write!(
             f,
-            "fn {}({}) {{ {} }}",
+            "fn {}({}) {}",
             self.name,
-            joined
-                .strip_suffix(", ")
-                .expect("Should always have a trailing ', '"),
+            joined.strip_suffix(", ").unwrap_or(""),
             self.block,
         )
     }
 }
 
-impl fmt::Display for Ident {
+#[derive(Debug, PartialEq)]
+pub struct DeclarationStmt {
+    pub name: Ident,
+    pub methods: Vec<FunctionStmt>,
+    pub fields: Vec<Ident>,
+    pub embeds: Vec<Embed>,
+}
+
+impl fmt::Display for DeclarationStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        if self.methods.is_empty() && self.fields.is_empty() && self.embeds.is_empty() {
+            return write!(f, "decl {} {{}}", self.name);
+        }
+        let methods = self
+            .methods
+            .iter()
+            .map(|func| func.to_string() + " ")
+            .collect::<String>();
+        let fields = self
+            .fields
+            .iter()
+            .map(|ident| ident.to_string() + " ")
+            .collect::<String>();
+        let embeds = self
+            .embeds
+            .iter()
+            .map(|embed| embed.to_string() + " ")
+            .collect::<String>();
+        write!(f, "decl {} {{ {fields}{embeds}{methods}}}", self.name)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Embed {
+    pub name: Ident,
+    pub assigned: Vec<Ident>,
+}
+
+impl fmt::Display for Embed {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.assigned.is_empty() {
+            return write!(f, "[{}] {{}}", self.name);
+        }
+        let assigned = self
+            .assigned
+            .iter()
+            .map(|embed| embed.to_string() + ", ")
+            .collect::<String>();
+        write!(f, "[{}] {{ {assigned} }}", self.name)
     }
 }
 
@@ -360,6 +412,9 @@ pub struct Block(pub Vec<Stmt>);
 
 impl fmt::Display for Block {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.0.is_empty() {
+            return write!(f, "{{}}");
+        }
         let joined = self
             .0
             .iter()
@@ -367,7 +422,7 @@ impl fmt::Display for Block {
             .collect::<String>();
         write!(
             f,
-            "{}",
+            "{{ {} }}",
             joined.strip_suffix(" ").expect("Should have trailing ' '")
         )
     }
@@ -421,6 +476,17 @@ mod tests {
             },
         ];
         let expecteds = ["(3 + 3)", "((3 > 5) + 3)"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn block_display() {
+        let inputs = [
+            Block(Vec::new()),
+            Block(vec![Stmt::Expr(Expr::Literal(Literal::Float(3.3)))]),
+        ];
+        let expecteds = ["{}", "{ 3.3; }"];
 
         test_to_string!(inputs, expecteds)
     }
@@ -559,8 +625,13 @@ mod tests {
                 params: vec![Ident("y".to_owned()), Ident("z".to_owned())],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
             },
+            FunctionStmt {
+                name: Ident("x".to_owned()),
+                params: Vec::new(),
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+            },
         ];
-        let expecteds = ["fn x(y) { 3; }", "fn x(y, z) { 3; }"];
+        let expecteds = ["fn x(y) { 3; }", "fn x(y, z) { 3; }", "fn x() { 3; }"];
 
         test_to_string!(inputs, expecteds)
     }
@@ -576,8 +647,47 @@ mod tests {
                 params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
             },
+            FunctionExpr {
+                params: Vec::new(),
+                block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
+            },
         ];
-        let expecteds = ["fn(x) { True; }", "fn(x, y) { True; }"];
+        let expecteds = ["fn(x) { True; }", "fn(x, y) { True; }", "fn() { True; }"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn decl_stmt_display() {
+        let inputs = [
+            DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                methods: Vec::new(),
+                fields: Vec::new(),
+                embeds: Vec::new(),
+            },
+            DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                fields: vec![Ident("test".to_owned()), Ident("test".to_owned())],
+                methods: Vec::new(),
+                embeds: Vec::new(),
+            },
+            DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                fields: vec![Ident("test".to_owned()), Ident("test".to_owned())],
+                methods: vec![FunctionStmt {
+                    name: Ident("testing".to_owned()),
+                    params: Vec::new(),
+                    block: Block(Vec::new()),
+                }],
+                embeds: Vec::new(),
+            },
+        ];
+        let expecteds = [
+            "decl Test {}",
+            "decl Test { test test }",
+            "decl Test { test test fn testing() {} }",
+        ];
 
         test_to_string!(inputs, expecteds)
     }

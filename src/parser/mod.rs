@@ -40,6 +40,9 @@ pub enum ParserError {
     #[error("expected `{:?}` on {pos}", token)]
     ExpectedToken { pos: Position, token: Token },
 
+    #[error("expected any of `{:?}` on {pos}", tokens)]
+    ExpectedAnyOf { pos: Position, tokens: Vec<Token> },
+
     #[error("unteriminated string on {pos}")]
     UnteriminatedString { pos: Position },
 
@@ -243,6 +246,7 @@ impl<'a> Parser<'a> {
             Token::If => Stmt::If(self.parse_if_stmt()?),
             Token::For => Stmt::For(self.parse_for_stmt()?),
             Token::While => Stmt::While(self.parse_while_stmt()?),
+            Token::Declaration => Stmt::Declaration(self.parse_decl_stmt()?),
             Token::Break => {
                 self.validate_current_scope(ScopeType::Loop)?;
                 Stmt::Break
@@ -527,6 +531,59 @@ impl<'a> Parser<'a> {
             name,
             params,
             block,
+        })
+    }
+
+    fn parse_decl_stmt(&mut self) -> Option<DeclarationStmt> {
+        self.next_token();
+        let name = self.parse_ident()?;
+
+        self.expect_peek(Token::Lbrace)?;
+        self.next_token();
+        let mut fields = Vec::new();
+        let mut methods = Vec::new();
+        let mut embeds = Vec::new();
+        while self.current_token != Token::Rbrace {
+            match &self.current_token {
+                Token::Ident(ident) => fields.push(Ident(ident.to_owned())),
+                Token::Lbracket => {
+                    self.next_token();
+                    let embed_name = self.parse_ident()?;
+                    self.expect_peek(Token::Rbracket)?;
+                    self.expect_peek(Token::Lbrace)?;
+                    self.next_token();
+                    let mut assigned = Vec::new();
+                    if self.current_token != Token::Rbrace {
+                        assigned.push(self.parse_ident()?);
+                        while self.peek_token == Token::Comma {
+                            self.next_token();
+                            self.next_token();
+                            let field = self.parse_ident()?;
+                            assigned.push(field);
+                        }
+                        self.expect_peek(Token::Rbrace)?;
+                    }
+                    embeds.push(Embed {
+                        name: embed_name,
+                        assigned,
+                    })
+                }
+                Token::Function => {
+                    let function = self.parse_function_stmt()?;
+                    methods.push(function);
+                }
+                _ => self.errors.push(ParserError::ExpectedAnyOf {
+                    pos: self.position(),
+                    tokens: vec![Token::Lbrace, Token::Function, Token::Ident("".to_owned())],
+                }),
+            }
+            self.next_token();
+        }
+        Some(DeclarationStmt {
+            name,
+            methods,
+            fields,
+            embeds,
         })
     }
 
@@ -1340,6 +1397,69 @@ mod tests {
                 })]),
             })]),
         }))];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_decl_stmt() {
+        let inputs = [
+            "decl Test { field1 field2 }",
+            "decl Test { field1 field2 fn xy(x, y) { 1; } }",
+            "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] { field1, field2 } }",
+            "decl Test {}",
+            "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] {} }",
+        ];
+        let expecteds = [
+            Stmt::Declaration(DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                methods: Vec::new(),
+                fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                embeds: Vec::new(),
+            }),
+            Stmt::Declaration(DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                methods: vec![FunctionStmt {
+                    name: Ident("xy".to_owned()),
+                    params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                    block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
+                }],
+                fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                embeds: Vec::new(),
+            }),
+            Stmt::Declaration(DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                methods: vec![FunctionStmt {
+                    name: Ident("xy".to_owned()),
+                    params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                    block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
+                }],
+                fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                embeds: vec![Embed {
+                    name: Ident("Testing".to_owned()),
+                    assigned: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                }],
+            }),
+            Stmt::Declaration(DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                methods: Vec::new(),
+                fields: Vec::new(),
+                embeds: Vec::new(),
+            }),
+            Stmt::Declaration(DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                methods: vec![FunctionStmt {
+                    name: Ident("xy".to_owned()),
+                    params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                    block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
+                }],
+                fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                embeds: vec![Embed {
+                    name: Ident("Testing".to_owned()),
+                    assigned: Vec::new(),
+                }],
+            }),
+        ];
 
         test_parse!(inputs, expecteds)
     }
