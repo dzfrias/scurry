@@ -10,6 +10,7 @@ pub enum Expr {
     Dot(DotExpr),
     Function(FunctionExpr),
     Call(CallExpr),
+    Index(IndexExpr),
 }
 
 impl fmt::Display for Expr {
@@ -21,6 +22,7 @@ impl fmt::Display for Expr {
             Self::Prefix(prefix) => write!(f, "{prefix}"),
             Self::Function(function) => write!(f, "{function}"),
             Self::Dot(dotexpr) => write!(f, "{dotexpr}"),
+            Self::Index(indexexpr) => write!(f, "{indexexpr}"),
             Self::Call(call) => write!(f, "{call}"),
         }
     }
@@ -112,6 +114,18 @@ impl fmt::Display for CallExpr {
             self.func,
             args.strip_suffix(", ").unwrap_or_default()
         )
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IndexExpr {
+    pub left: Box<Expr>,
+    pub index: Box<Expr>,
+}
+
+impl fmt::Display for IndexExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}[{}]", self.left, self.index)
     }
 }
 

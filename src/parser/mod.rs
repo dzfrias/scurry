@@ -331,6 +331,10 @@ impl<'a> Parser<'a> {
                     self.next_token();
                     Expr::Infix(self.parse_infix_expr(left_exp)?)
                 }
+                Token::Lbracket => {
+                    self.next_token();
+                    Expr::Index(self.parse_index_expr(left_exp)?)
+                }
                 Token::Dot => {
                     self.next_token();
                     Expr::Dot(self.parse_dot_expr(left_exp)?)
@@ -641,6 +645,16 @@ impl<'a> Parser<'a> {
         self.expect_peek(end)?;
 
         Some(exprs)
+    }
+
+    fn parse_index_expr(&mut self, left_exp: Expr) -> Option<IndexExpr> {
+        self.next_token();
+        let index = self.parse_expr(Precedence::Lowest)?;
+        self.expect_peek(Token::Rbracket)?;
+        Some(IndexExpr {
+            left: Box::new(left_exp),
+            index: Box::new(index),
+        })
     }
 }
 
@@ -1536,6 +1550,17 @@ mod tests {
             )]))),
             Stmt::Expr(Expr::Literal(Literal::Array(Vec::new()))),
         ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_index_expr() {
+        let inputs = ["x[3];"];
+        let expecteds = [Stmt::Expr(Expr::Index(IndexExpr {
+            left: Box::new(Expr::Ident(Ident("x".to_owned()))),
+            index: Box::new(Expr::Literal(Literal::Integer(3))),
+        }))];
 
         test_parse!(inputs, expecteds)
     }
