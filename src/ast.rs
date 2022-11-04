@@ -121,6 +121,7 @@ pub enum Literal {
     Boolean(bool),
     String(String),
     Float(f32),
+    Array(Vec<Expr>),
 }
 
 impl fmt::Display for Literal {
@@ -136,6 +137,13 @@ impl fmt::Display for Literal {
                 }
             }),
             Self::String(s) => write!(f, "\"{s}\""),
+            Self::Array(arr) => {
+                let joined = arr
+                    .iter()
+                    .map(|expr| expr.to_string() + ", ")
+                    .collect::<String>();
+                write!(f, "[{}]", joined.strip_suffix(", ").unwrap_or_default())
+            }
         }
     }
 }
@@ -472,8 +480,14 @@ mod tests {
             Literal::Integer(3),
             Literal::Boolean(true),
             Literal::String("test".to_owned()),
+            Literal::Array(vec![Expr::Literal(Literal::Integer(3))]),
+            Literal::Array(vec![
+                Expr::Literal(Literal::Integer(3)),
+                Expr::Ident(Ident("x".to_owned())),
+            ]),
+            Literal::Array(Vec::new()),
         ];
-        let expecteds = ["3", "True", "\"test\""];
+        let expecteds = ["3", "True", "\"test\"", "[3]", "[3, x]", "[]"];
 
         test_to_string!(inputs, expecteds)
     }

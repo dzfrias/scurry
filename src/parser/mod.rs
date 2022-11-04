@@ -277,6 +277,9 @@ impl<'a> Parser<'a> {
             Token::Float(f) => Expr::Literal(Literal::Float(f)),
             Token::True => Expr::Literal(Literal::Boolean(true)),
             Token::False => Expr::Literal(Literal::Boolean(false)),
+            Token::Lbracket => {
+                Expr::Literal(Literal::Array(self.parse_expr_list(Token::Rbracket)?))
+            }
             Token::String(ref s) => Expr::Literal(Literal::String(s.to_owned())),
             Token::Ident(_) => Expr::Ident(self.parse_ident().expect("Should be on ident")),
             Token::Bang | Token::Minus | Token::Plus => Expr::Prefix(self.parse_prefix_expr()?),
@@ -1514,6 +1517,24 @@ mod tests {
                 func: Box::new(Expr::Ident(Ident("test".to_owned()))),
                 args: Vec::new(),
             })),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_array_literal() {
+        let inputs = ["[1, 2, 3];", "[1];", "[];"];
+        let expecteds = [
+            Stmt::Expr(Expr::Literal(Literal::Array(vec![
+                Expr::Literal(Literal::Integer(1)),
+                Expr::Literal(Literal::Integer(2)),
+                Expr::Literal(Literal::Integer(3)),
+            ]))),
+            Stmt::Expr(Expr::Literal(Literal::Array(vec![Expr::Literal(
+                Literal::Integer(1),
+            )]))),
+            Stmt::Expr(Expr::Literal(Literal::Array(Vec::new()))),
         ];
 
         test_parse!(inputs, expecteds)
