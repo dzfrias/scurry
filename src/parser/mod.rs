@@ -37,7 +37,7 @@ impl fmt::Display for Position {
 
 #[derive(Debug, Error, PartialEq)]
 pub enum ParserError {
-    #[error("expected `{:?}` on {pos}", token)]
+    #[error("expected `{token}` on {pos}")]
     ExpectedToken { pos: Position, token: Token },
 
     #[error("expected any of `{:?}` on {pos}", tokens)]
@@ -49,15 +49,14 @@ pub enum ParserError {
     #[error("illegal character(s) on {pos}")]
     IllegalCharacter { pos: Position },
 
-    #[error("invalid operator in this context: `{:?}` on {pos}", token)]
+    #[error("invalid operator in this context: `{token}` on {pos}")]
     InvalidPrefixOperator { token: Token, pos: Position },
 
-    #[error("illegal ident, cannot have number in front: `{:?}` on {pos}", ident)]
+    #[error("illegal ident, cannot have number in front: `{ident}` on {pos}")]
     InvalidIdent { ident: String, pos: Position },
 
     #[error(
-        "invalid token `{:?}` at {pos}, must be used in a `{}` scope",
-        token,
+        "invalid token `{token}` at {pos}, must be used in a `{}` scope",
         expect_scope
     )]
     InvalidKeywordInScope {

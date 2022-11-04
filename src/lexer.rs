@@ -1,4 +1,5 @@
 use logos::{self, Logos};
+use std::fmt;
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token {
@@ -106,6 +107,61 @@ pub enum Token {
     ErrorUnterminatedString,
     #[regex("[_A-Za-z0-9][_A-Za-z0-9]*", |lex| lex.slice().to_owned())]
     ErrorInvalidIdent(String),
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::Ident(_) => write!(f, "IDENT"),
+            Token::Float(_) => write!(f, "FLOAT"),
+            Token::Integer(_) => write!(f, "INTEGER"),
+            Token::String(_) => write!(f, "STRING"),
+            Token::True => write!(f, "BOOLEAN"),
+            Token::False => write!(f, "BOOLEAN"),
+            Token::Assign => write!(f, "="),
+            Token::Plus => write!(f, "+"),
+            Token::Minus => write!(f, "-"),
+            Token::Bang => write!(f, "!"),
+            Token::Asterisk => write!(f, "*"),
+            Token::Slash => write!(f, "/"),
+            Token::Percent => write!(f, "%"),
+            Token::Dot => write!(f, "."),
+            Token::Lt => write!(f, "<"),
+            Token::Gt => write!(f, ">"),
+            Token::Eq => write!(f, "=="),
+            Token::NotEq => write!(f, "!="),
+            Token::Ge => write!(f, ">="),
+            Token::Le => write!(f, "<="),
+            Token::LogicalAnd => write!(f, "&&"),
+            Token::LogicalOr => write!(f, "||"),
+            Token::Comma => write!(f, ","),
+            Token::Colon => write!(f, ":"),
+            Token::Semicolon => write!(f, ";"),
+            Token::Lparen => write!(f, "("),
+            Token::Rparen => write!(f, ")"),
+            Token::Lbrace => write!(f, "{{"),
+            Token::Rbrace => write!(f, "}}"),
+            Token::Lbracket => write!(f, "["),
+            Token::Rbracket => write!(f, "]"),
+            Token::Function => write!(f, "fn"),
+            Token::If => write!(f, "if"),
+            Token::Else => write!(f, "else"),
+            Token::Elif => write!(f, "elif"),
+            Token::Return => write!(f, "return"),
+            Token::For => write!(f, "for"),
+            Token::In => write!(f, "in"),
+            Token::While => write!(f, "while"),
+            Token::Break => write!(f, "break"),
+            Token::Continue => write!(f, "continue"),
+            Token::Declaration => write!(f, "decl"),
+            Token::EOF => write!(f, "EOF"),
+            Token::Newline => write!(f, "NEWLINE"),
+            Token::HorizontalWhitespace => write!(f, "WHITESPACE"),
+            Token::Error => write!(f, "ERROR"),
+            Token::ErrorUnterminatedString => write!(f, "ERRORUNTERMINATEDSTRING"),
+            Token::ErrorInvalidIdent(_) => write!(f, "ERRORINVALIDIDENT"),
+        }
+    }
 }
 
 #[cfg(test)]
