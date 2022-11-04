@@ -9,6 +9,7 @@ pub enum Expr {
     Prefix(PrefixExpr),
     Dot(DotExpr),
     Function(FunctionExpr),
+    Call(CallExpr),
 }
 
 impl fmt::Display for Expr {
@@ -20,6 +21,7 @@ impl fmt::Display for Expr {
             Self::Prefix(prefix) => write!(f, "{prefix}"),
             Self::Function(function) => write!(f, "{function}"),
             Self::Dot(dotexpr) => write!(f, "{dotexpr}"),
+            Self::Call(call) => write!(f, "{call}"),
         }
     }
 }
@@ -87,6 +89,28 @@ impl fmt::Display for FunctionExpr {
                 .strip_suffix(", ")
                 .expect("Should always have a trailing ', '"),
             self.block,
+        )
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct CallExpr {
+    pub func: Box<Expr>,
+    pub args: Vec<Expr>,
+}
+
+impl fmt::Display for CallExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let args = self
+            .args
+            .iter()
+            .map(|arg| arg.to_string() + ", ")
+            .collect::<String>();
+        write!(
+            f,
+            "{}({})",
+            self.func,
+            args.strip_suffix(", ").unwrap_or_default()
         )
     }
 }
@@ -688,6 +712,30 @@ mod tests {
             "decl Test { test test }",
             "decl Test { test test fn testing() {} }",
         ];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn call_expr_display() {
+        let inputs = [
+            CallExpr {
+                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                args: vec![
+                    Expr::Literal(Literal::Integer(4)),
+                    Expr::Ident(Ident("testing".to_owned())),
+                ],
+            },
+            CallExpr {
+                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                args: vec![Expr::Literal(Literal::Integer(4))],
+            },
+            CallExpr {
+                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                args: Vec::new(),
+            },
+        ];
+        let expecteds = ["test(4, testing)", "test(4)", "test()"];
 
         test_to_string!(inputs, expecteds)
     }

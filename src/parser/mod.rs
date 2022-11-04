@@ -332,6 +332,10 @@ impl<'a> Parser<'a> {
                     self.next_token();
                     Expr::Dot(self.parse_dot_expr(left_exp)?)
                 }
+                Token::Lparen => {
+                    self.next_token();
+                    Expr::Call(self.parse_call_expr(left_exp)?)
+                }
                 _ => return Some(left_exp),
             };
         }
@@ -606,6 +610,34 @@ impl<'a> Parser<'a> {
         self.expect_peek(Token::Rparen);
 
         Some(idents)
+    }
+
+    fn parse_call_expr(&mut self, left_exp: Expr) -> Option<CallExpr> {
+        let args = self.parse_expr_list(Token::Rparen)?;
+        Some(CallExpr {
+            func: Box::new(left_exp),
+            args,
+        })
+    }
+
+    fn parse_expr_list(&mut self, end: Token) -> Option<Vec<Expr>> {
+        let mut exprs = Vec::new();
+        if self.peek_token == end {
+            self.next_token();
+            return Some(exprs);
+        }
+
+        self.next_token();
+        exprs.push(self.parse_expr(Precedence::Lowest)?);
+
+        while self.peek_token == Token::Comma {
+            self.next_token();
+            self.next_token();
+            exprs.push(self.parse_expr(Precedence::Lowest)?);
+        }
+        self.expect_peek(end)?;
+
+        Some(exprs)
     }
 }
 
@@ -1458,6 +1490,30 @@ mod tests {
                     assigned: Vec::new(),
                 }],
             }),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_call_expr() {
+        let inputs = ["test(x, y);", "test(3);", "test();"];
+        let expecteds = [
+            Stmt::Expr(Expr::Call(CallExpr {
+                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                args: vec![
+                    Expr::Ident(Ident("x".to_owned())),
+                    Expr::Ident(Ident("y".to_owned())),
+                ],
+            })),
+            Stmt::Expr(Expr::Call(CallExpr {
+                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                args: vec![Expr::Literal(Literal::Integer(3))],
+            })),
+            Stmt::Expr(Expr::Call(CallExpr {
+                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                args: Vec::new(),
+            })),
         ];
 
         test_parse!(inputs, expecteds)
