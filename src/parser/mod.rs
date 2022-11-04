@@ -285,6 +285,7 @@ impl<'a> Parser<'a> {
             Token::Bang | Token::Minus | Token::Plus => Expr::Prefix(self.parse_prefix_expr()?),
             Token::Function => Expr::Function(self.parse_function_expr()?),
             Token::Lparen => self.parse_grouped_expr()?,
+            Token::Lbrace => Expr::Literal(Literal::Map(self.parse_map_literal()?)),
             Token::Error => {
                 self.errors.push(ParserError::IllegalCharacter {
                     pos: self.position(),
@@ -655,6 +656,24 @@ impl<'a> Parser<'a> {
             left: Box::new(left_exp),
             index: Box::new(index),
         })
+    }
+
+    fn parse_map_literal(&mut self) -> Option<Vec<(Expr, Expr)>> {
+        let mut pairs = Vec::new();
+        while self.peek_token != Token::Rbrace {
+            self.next_token();
+            let key = self.parse_expr(Precedence::Lowest)?;
+            self.expect_peek(Token::Colon)?;
+            self.next_token();
+            let value = self.parse_expr(Precedence::Lowest)?;
+            pairs.push((key, value));
+            if self.peek_token != Token::Rbrace && self.expect_peek(Token::Comma).is_none() {
+                return None;
+            }
+        }
+        self.expect_peek(Token::Rbrace)
+            .expect("Should have an rbrace");
+        Some(pairs)
     }
 }
 
@@ -1561,6 +1580,30 @@ mod tests {
             left: Box::new(Expr::Ident(Ident("x".to_owned()))),
             index: Box::new(Expr::Literal(Literal::Integer(3))),
         }))];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_map_literal() {
+        let inputs = ["{1: 3};", "{1: 3, 3: 2};", "{}"];
+        let expecteds = [
+            Stmt::Expr(Expr::Literal(Literal::Map(vec![(
+                Expr::Literal(Literal::Integer(1)),
+                Expr::Literal(Literal::Integer(3)),
+            )]))),
+            Stmt::Expr(Expr::Literal(Literal::Map(vec![
+                (
+                    Expr::Literal(Literal::Integer(1)),
+                    Expr::Literal(Literal::Integer(3)),
+                ),
+                (
+                    Expr::Literal(Literal::Integer(3)),
+                    Expr::Literal(Literal::Integer(2)),
+                ),
+            ]))),
+            Stmt::Expr(Expr::Literal(Literal::Map(Vec::new()))),
+        ];
 
         test_parse!(inputs, expecteds)
     }

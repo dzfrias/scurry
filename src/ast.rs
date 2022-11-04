@@ -136,6 +136,7 @@ pub enum Literal {
     String(String),
     Float(f32),
     Array(Vec<Expr>),
+    Map(Vec<(Expr, Expr)>),
 }
 
 impl fmt::Display for Literal {
@@ -157,6 +158,13 @@ impl fmt::Display for Literal {
                     .map(|expr| expr.to_string() + ", ")
                     .collect::<String>();
                 write!(f, "[{}]", joined.strip_suffix(", ").unwrap_or_default())
+            }
+            Self::Map(map) => {
+                let joined = map
+                    .iter()
+                    .map(|(key, val)| key.to_string() + ": " + &val.to_string() + ", ")
+                    .collect::<String>();
+                write!(f, "{{{}}}", joined.strip_suffix(", ").unwrap_or_default())
             }
         }
     }
@@ -500,8 +508,33 @@ mod tests {
                 Expr::Ident(Ident("x".to_owned())),
             ]),
             Literal::Array(Vec::new()),
+            Literal::Map(vec![(
+                Expr::Literal(Literal::Integer(1)),
+                Expr::Literal(Literal::Integer(2)),
+            )]),
+            Literal::Map(vec![
+                (
+                    Expr::Literal(Literal::Integer(1)),
+                    Expr::Literal(Literal::Integer(2)),
+                ),
+                (
+                    Expr::Literal(Literal::Integer(3)),
+                    Expr::Literal(Literal::Integer(3)),
+                ),
+            ]),
+            Literal::Map(Vec::new()),
         ];
-        let expecteds = ["3", "True", "\"test\"", "[3]", "[3, x]", "[]"];
+        let expecteds = [
+            "3",
+            "True",
+            "\"test\"",
+            "[3]",
+            "[3, x]",
+            "[]",
+            "{1: 2}",
+            "{1: 2, 3: 3}",
+            "{}",
+        ];
 
         test_to_string!(inputs, expecteds)
     }
