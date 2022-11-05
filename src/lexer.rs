@@ -90,6 +90,12 @@ pub enum Token {
     Break,
     #[token("continue")]
     Continue,
+    #[token("switch")]
+    Switch,
+    #[token("case")]
+    Case,
+    #[token("default")]
+    Default,
     #[token("decl")]
     Declaration,
 
@@ -153,6 +159,9 @@ impl fmt::Display for Token {
             Token::While => write!(f, "while"),
             Token::Break => write!(f, "break"),
             Token::Continue => write!(f, "continue"),
+            Token::Switch => write!(f, "switch"),
+            Token::Case => write!(f, "case"),
+            Token::Default => write!(f, "default"),
             Token::Declaration => write!(f, "decl"),
             Token::EOF => write!(f, "EOF"),
             Token::Newline => write!(f, "NEWLINE"),
@@ -460,6 +469,24 @@ mod tests {
     fn tokenizes_continue() {
         let mut lexer = Token::lexer("continue");
         assert_eq!(Token::Continue, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_switch() {
+        let mut lexer = Token::lexer("switch");
+        assert_eq!(Token::Switch, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_case() {
+        let mut lexer = Token::lexer("case");
+        assert_eq!(Token::Case, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_default() {
+        let mut lexer = Token::lexer("default");
+        assert_eq!(Token::Default, lexer.next().expect("Should lex something"));
     }
 
     #[test]

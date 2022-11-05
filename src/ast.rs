@@ -281,6 +281,7 @@ pub enum Stmt {
 
     For(ForStmt),
     While(WhileStmt),
+    Switch(SwitchStmt),
     Break,
     Continue,
 
@@ -296,6 +297,7 @@ impl fmt::Display for Stmt {
             Self::For(stmt) => write!(f, "{stmt}"),
             Self::While(stmt) => write!(f, "{stmt}"),
             Self::Function(stmt) => write!(f, "{stmt}"),
+            Self::Switch(stmt) => write!(f, "{stmt}"),
             Self::Declaration(_) => todo!(),
             Self::Break => write!(f, "break;"),
             Self::Continue => write!(f, "continue;"),
@@ -406,6 +408,43 @@ impl fmt::Display for FunctionStmt {
             joined.strip_suffix(", ").unwrap_or(""),
             self.block,
         )
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct SwitchStmt {
+    pub expr: Expr,
+    pub cases: Vec<Case>,
+    pub default: Option<Block>,
+}
+
+impl fmt::Display for SwitchStmt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.cases.is_empty() && self.default.is_none() {
+            return write!(f, "switch {} {{}}", self.expr);
+        }
+        let cases = self
+            .cases
+            .iter()
+            .map(|case| case.to_string() + " ")
+            .collect::<String>();
+        if let Some(block) = &self.default {
+            write!(f, "switch {} {{ {cases}default {block} }}", self.expr)
+        } else {
+            write!(f, "switch {} {{ {cases}}}", self.expr)
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Case {
+    pub condition: Expr,
+    pub block: Block,
+}
+
+impl fmt::Display for Case {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "case {} {}", self.condition, self.block)
     }
 }
 
@@ -797,6 +836,61 @@ mod tests {
             },
         ];
         let expecteds = ["test(4, testing)", "test(4)", "test()"];
+
+        test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn switch_stmt_display() {
+        let inputs = [
+            SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: vec![Case {
+                    condition: Expr::Ident(Ident("y".to_owned())),
+                    block: Block(Vec::new()),
+                }],
+                default: None,
+            },
+            SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: vec![
+                    Case {
+                        condition: Expr::Ident(Ident("y".to_owned())),
+                        block: Block(Vec::new()),
+                    },
+                    Case {
+                        condition: Expr::Literal(Literal::Integer(3)),
+                        block: Block(Vec::new()),
+                    },
+                ],
+                default: None,
+            },
+            SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: Vec::new(),
+                default: None,
+            },
+            SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: vec![Case {
+                    condition: Expr::Ident(Ident("y".to_owned())),
+                    block: Block(Vec::new()),
+                }],
+                default: Some(Block(Vec::new())),
+            },
+            SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: Vec::new(),
+                default: Some(Block(Vec::new())),
+            },
+        ];
+        let expecteds = [
+            "switch x { case y {} }",
+            "switch x { case y {} case 3 {} }",
+            "switch x {}",
+            "switch x { case y {} default {} }",
+            "switch x { default {} }",
+        ];
 
         test_to_string!(inputs, expecteds)
     }

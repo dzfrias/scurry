@@ -246,6 +246,7 @@ impl<'a> Parser<'a> {
             Token::For => Stmt::For(self.parse_for_stmt()?),
             Token::While => Stmt::While(self.parse_while_stmt()?),
             Token::Declaration => Stmt::Declaration(self.parse_decl_stmt()?),
+            Token::Switch => Stmt::Switch(self.parse_switch_stmt()?),
             Token::Break => {
                 self.validate_current_scope(ScopeType::Loop)?;
                 Stmt::Break
@@ -595,6 +596,52 @@ impl<'a> Parser<'a> {
             methods,
             fields,
             embeds,
+        })
+    }
+
+    fn parse_switch_stmt(&mut self) -> Option<SwitchStmt> {
+        self.next_token();
+        let expr = self.parse_expr(Precedence::Lowest)?;
+        self.expect_peek(Token::Lbrace)?;
+        self.next_token();
+        if self.current_token == Token::Rbrace {
+            return Some(SwitchStmt {
+                expr,
+                cases: Vec::new(),
+                default: None,
+            });
+        }
+        let mut cases = Vec::new();
+        let mut default_case = None;
+        while self.current_token != Token::Rbrace {
+            if self.current_token == Token::Default {
+                self.expect_peek(Token::Lbrace)?;
+                default_case = Some(self.parse_block()?);
+                self.next_token();
+                continue;
+            }
+            if self.current_token != Token::Case {
+                self.errors.push(ParserError::ExpectedAnyOf {
+                    pos: self.position(),
+                    tokens: vec![Token::Default, Token::Case],
+                });
+                return None;
+            }
+            self.next_token();
+            let case_expr = self.parse_expr(Precedence::Lowest)?;
+            self.expect_peek(Token::Lbrace)?;
+            let block = self.parse_block()?;
+            self.next_token();
+            cases.push(Case {
+                condition: case_expr,
+                block,
+            })
+        }
+
+        Some(SwitchStmt {
+            expr,
+            cases,
+            default: default_case,
         })
     }
 
@@ -1603,6 +1650,62 @@ mod tests {
                 ),
             ]))),
             Stmt::Expr(Expr::Literal(Literal::Map(Vec::new()))),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_switch_stmt() {
+        let inputs = [
+            "switch x { case y {} }",
+            "switch x { case y {} case 3 {} }",
+            "switch x {}",
+            "switch x { case y {} default {} }",
+            "switch x { default {} }",
+        ];
+
+        let expecteds = [
+            Stmt::Switch(SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: vec![Case {
+                    condition: Expr::Ident(Ident("y".to_owned())),
+                    block: Block(Vec::new()),
+                }],
+                default: None,
+            }),
+            Stmt::Switch(SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: vec![
+                    Case {
+                        condition: Expr::Ident(Ident("y".to_owned())),
+                        block: Block(Vec::new()),
+                    },
+                    Case {
+                        condition: Expr::Literal(Literal::Integer(3)),
+                        block: Block(Vec::new()),
+                    },
+                ],
+                default: None,
+            }),
+            Stmt::Switch(SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: Vec::new(),
+                default: None,
+            }),
+            Stmt::Switch(SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: vec![Case {
+                    condition: Expr::Ident(Ident("y".to_owned())),
+                    block: Block(Vec::new()),
+                }],
+                default: Some(Block(Vec::new())),
+            }),
+            Stmt::Switch(SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: Vec::new(),
+                default: Some(Block(Vec::new())),
+            }),
         ];
 
         test_parse!(inputs, expecteds)
