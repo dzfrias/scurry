@@ -170,7 +170,7 @@ impl fmt::Display for Literal {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum InfixOp {
     Plus,
     Minus,
@@ -230,7 +230,7 @@ impl fmt::Display for InfixOp {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum PrefixOp {
     Minus,
     Bang,
@@ -260,7 +260,7 @@ impl fmt::Display for PrefixOp {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Ident(pub String);
 
 impl fmt::Display for Ident {
@@ -339,7 +339,7 @@ pub struct IfStmt {
 
 impl fmt::Display for IfStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut s = String::from(format!("if {} {}", self.condition, self.true_block));
+        let mut s = format!("if {} {}", self.condition, self.true_block);
         for elif in &self.elifs {
             s.push_str(&format!(" {elif}"));
         }
@@ -480,7 +480,7 @@ impl fmt::Display for DeclarationStmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Embed {
     pub name: Ident,
     pub assigned: Vec<Ident>,
@@ -516,7 +516,7 @@ impl fmt::Display for Block {
         write!(
             f,
             "{{ {} }}",
-            joined.strip_suffix(" ").expect("Should have trailing ' '")
+            joined.strip_suffix(' ').expect("Should have trailing ' '")
         )
     }
 }

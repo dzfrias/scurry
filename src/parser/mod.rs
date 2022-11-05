@@ -5,7 +5,7 @@ use std::fmt;
 use std::ops::Range;
 use thiserror::Error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Position {
     line: usize,
     range: Range<usize>,
@@ -96,7 +96,7 @@ impl From<&Token> for Precedence {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub enum ScopeType {
     Function,
     Loop,
@@ -432,7 +432,7 @@ impl<'a> Parser<'a> {
     fn validate_current_scope(&mut self, expect_scope: ScopeType) -> Option<ScopeType> {
         if let Some(scope) = self.scope_stack.last() {
             if scope == &expect_scope {
-                return Some(expect_scope.clone());
+                return Some(expect_scope);
             }
         }
         self.errors.push(ParserError::InvalidKeywordInScope {
@@ -445,7 +445,7 @@ impl<'a> Parser<'a> {
 
     fn scopes_contain(&mut self, expect_scope: ScopeType) -> Option<ScopeType> {
         if self.scope_stack.contains(&expect_scope) {
-            return Some(expect_scope);
+            Some(expect_scope)
         } else {
             self.errors.push(ParserError::InvalidKeywordInScope {
                 token: self.current_token.clone(),

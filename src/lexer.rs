@@ -9,7 +9,7 @@ pub enum Token {
     Float(f32),
     #[regex(r"[0-9]+", |lex| lex.slice().parse(), priority = 2)]
     Integer(i32),
-    #[regex("\"(?s:[^\"\\\\]|\\\\.)*\"", |lex| lex.slice().strip_prefix("\"").expect("Should have leading \"").strip_suffix("\"").expect("Should have trailing \"").to_owned())]
+    #[regex("\"(?s:[^\"\\\\]|\\\\.)*\"", |lex| lex.slice().strip_prefix('"').expect("Should have leading \"").strip_suffix('"').expect("Should have trailing \"").to_owned())]
     String(String),
     #[token("True")]
     True,
