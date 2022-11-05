@@ -438,13 +438,25 @@ impl fmt::Display for SwitchStmt {
 
 #[derive(Debug, PartialEq)]
 pub struct Case {
-    pub condition: Expr,
+    pub conditions: Vec<Expr>,
     pub block: Block,
 }
 
 impl fmt::Display for Case {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "case {} {}", self.condition, self.block)
+        let cases = self
+            .conditions
+            .iter()
+            .map(|expr| expr.to_string() + " | ")
+            .collect::<String>();
+        write!(
+            f,
+            "case {} {}",
+            cases
+                .strip_suffix(" | ")
+                .expect("Should have trailing ' | '"),
+            self.block
+        )
     }
 }
 
@@ -846,7 +858,7 @@ mod tests {
             SwitchStmt {
                 expr: Expr::Ident(Ident("x".to_owned())),
                 cases: vec![Case {
-                    condition: Expr::Ident(Ident("y".to_owned())),
+                    conditions: vec![Expr::Ident(Ident("y".to_owned()))],
                     block: Block(Vec::new()),
                 }],
                 default: None,
@@ -855,11 +867,11 @@ mod tests {
                 expr: Expr::Ident(Ident("x".to_owned())),
                 cases: vec![
                     Case {
-                        condition: Expr::Ident(Ident("y".to_owned())),
+                        conditions: vec![Expr::Ident(Ident("y".to_owned()))],
                         block: Block(Vec::new()),
                     },
                     Case {
-                        condition: Expr::Literal(Literal::Integer(3)),
+                        conditions: vec![Expr::Literal(Literal::Integer(3))],
                         block: Block(Vec::new()),
                     },
                 ],
@@ -873,7 +885,7 @@ mod tests {
             SwitchStmt {
                 expr: Expr::Ident(Ident("x".to_owned())),
                 cases: vec![Case {
-                    condition: Expr::Ident(Ident("y".to_owned())),
+                    conditions: vec![Expr::Ident(Ident("y".to_owned()))],
                     block: Block(Vec::new()),
                 }],
                 default: Some(Block(Vec::new())),
@@ -883,6 +895,17 @@ mod tests {
                 cases: Vec::new(),
                 default: Some(Block(Vec::new())),
             },
+            SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: vec![Case {
+                    conditions: vec![
+                        Expr::Ident(Ident("y".to_owned())),
+                        Expr::Ident(Ident("z".to_owned())),
+                    ],
+                    block: Block(Vec::new()),
+                }],
+                default: None,
+            },
         ];
         let expecteds = [
             "switch x { case y {} }",
@@ -890,6 +913,7 @@ mod tests {
             "switch x {}",
             "switch x { case y {} default {} }",
             "switch x { default {} }",
+            "switch x { case y | z {} }",
         ];
 
         test_to_string!(inputs, expecteds)

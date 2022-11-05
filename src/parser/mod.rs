@@ -628,14 +628,17 @@ impl<'a> Parser<'a> {
                 return None;
             }
             self.next_token();
-            let case_expr = self.parse_expr(Precedence::Lowest)?;
+            let mut conditions = Vec::new();
+            conditions.push(self.parse_expr(Precedence::Lowest)?);
+            while self.peek_token == Token::Pipe {
+                self.next_token();
+                self.next_token();
+                conditions.push(self.parse_expr(Precedence::Lowest)?);
+            }
             self.expect_peek(Token::Lbrace)?;
             let block = self.parse_block()?;
             self.next_token();
-            cases.push(Case {
-                condition: case_expr,
-                block,
-            })
+            cases.push(Case { conditions, block })
         }
 
         Some(SwitchStmt {
@@ -1663,13 +1666,14 @@ mod tests {
             "switch x {}",
             "switch x { case y {} default {} }",
             "switch x { default {} }",
+            "switch x { case y | z {} }",
         ];
 
         let expecteds = [
             Stmt::Switch(SwitchStmt {
                 expr: Expr::Ident(Ident("x".to_owned())),
                 cases: vec![Case {
-                    condition: Expr::Ident(Ident("y".to_owned())),
+                    conditions: vec![Expr::Ident(Ident("y".to_owned()))],
                     block: Block(Vec::new()),
                 }],
                 default: None,
@@ -1678,11 +1682,11 @@ mod tests {
                 expr: Expr::Ident(Ident("x".to_owned())),
                 cases: vec![
                     Case {
-                        condition: Expr::Ident(Ident("y".to_owned())),
+                        conditions: vec![Expr::Ident(Ident("y".to_owned()))],
                         block: Block(Vec::new()),
                     },
                     Case {
-                        condition: Expr::Literal(Literal::Integer(3)),
+                        conditions: vec![Expr::Literal(Literal::Integer(3))],
                         block: Block(Vec::new()),
                     },
                 ],
@@ -1696,7 +1700,7 @@ mod tests {
             Stmt::Switch(SwitchStmt {
                 expr: Expr::Ident(Ident("x".to_owned())),
                 cases: vec![Case {
-                    condition: Expr::Ident(Ident("y".to_owned())),
+                    conditions: vec![Expr::Ident(Ident("y".to_owned()))],
                     block: Block(Vec::new()),
                 }],
                 default: Some(Block(Vec::new())),
@@ -1705,6 +1709,17 @@ mod tests {
                 expr: Expr::Ident(Ident("x".to_owned())),
                 cases: Vec::new(),
                 default: Some(Block(Vec::new())),
+            }),
+            Stmt::Switch(SwitchStmt {
+                expr: Expr::Ident(Ident("x".to_owned())),
+                cases: vec![Case {
+                    conditions: vec![
+                        Expr::Ident(Ident("y".to_owned())),
+                        Expr::Ident(Ident("z".to_owned())),
+                    ],
+                    block: Block(Vec::new()),
+                }],
+                default: None,
             }),
         ];
 
