@@ -2,6 +2,7 @@ use clap::Parser as ArgParser;
 use rustyline::error::ReadlineError;
 use rustyline::{Config, Editor, Result};
 use scurry::format_position;
+use scurry::interpreter::Interpreter;
 use scurry::parser::{Parser, ParserError};
 use std::process;
 
@@ -18,6 +19,7 @@ fn start_repl() -> Result<()> {
 
     let config = Config::builder().indent_size(4).tab_stop(4).build();
     let mut editor = Editor::<()>::with_config(config)?;
+    let mut interpreter = Interpreter::new();
     loop {
         let readline = editor.readline(PROMPT);
         match readline {
@@ -26,11 +28,10 @@ fn start_repl() -> Result<()> {
 
                 let parser = Parser::new(&line);
                 match parser.parse() {
-                    Ok(program) => {
-                        for stmt in program.0 {
-                            println!("{:?}", stmt);
-                        }
-                    }
+                    Ok(program) => match interpreter.eval_repl(program) {
+                        Ok(obj) => println!("{obj}"),
+                        Err(err) => println!("{err}"),
+                    },
                     Err(errs) => {
                         println!("parser errors:");
                         for err in errs {
