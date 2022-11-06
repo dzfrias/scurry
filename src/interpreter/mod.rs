@@ -140,6 +140,9 @@ impl Interpreter {
             (Object::Bool(left), Object::Bool(right)) => {
                 self.eval_bool_infix_expr(op, *left, *right, line)
             }
+            (Object::String(s1), Object::String(s2)) => {
+                self.eval_string_infix_expr(op, s1, s2, line)
+            }
             _ => match op {
                 InfixOp::Eq => Ok(Object::Bool(left == right)),
                 InfixOp::NotEq => Ok(Object::Bool(left != right)),
@@ -276,6 +279,20 @@ impl Interpreter {
                 op,
                 left: Type::Bool,
                 right: Type::Bool,
+                line,
+            }),
+        }
+    }
+
+    fn eval_string_infix_expr(&self, op: InfixOp, s1: &str, s2: &str, line: usize) -> EvalResult {
+        match op {
+            InfixOp::Plus => Ok(Object::String(s1.to_owned() + s2)),
+            InfixOp::Eq => Ok(Object::Bool(s1 == s2)),
+            InfixOp::NotEq => Ok(Object::Bool(s1 != s2)),
+            _ => Err(RuntimeError::InvalidBinaryOperand {
+                op,
+                left: Type::String,
+                right: Type::String,
                 line,
             }),
         }
@@ -533,6 +550,14 @@ mod tests {
             Object::Bool(true),
             Object::Float(0.0),
         ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_string_infix_expr() {
+        let inputs = ["\"hello\" + \" world\";"];
+        let expecteds = [Object::String("hello world".to_owned())];
 
         test_eval!(inputs, expecteds)
     }
