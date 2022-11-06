@@ -130,6 +130,13 @@ impl Interpreter {
     fn eval_infix_expr(&self, op: InfixOp, left: Object, right: Object, line: usize) -> EvalResult {
         match (&left, &right) {
             (Object::Int(x), Object::Int(y)) => self.eval_int_infix_expr(op, *x, *y, line),
+            (Object::Float(x), Object::Float(y)) => self.eval_float_infix_expr(op, *x, *y, line),
+            (Object::Int(x), Object::Float(y)) => {
+                self.eval_float_infix_expr(op, *x as f32, *y, line)
+            }
+            (Object::Float(x), Object::Int(y)) => {
+                self.eval_float_infix_expr(op, *x, *y as f32, line)
+            }
             (Object::Bool(left), Object::Bool(right)) => {
                 self.eval_bool_infix_expr(op, *left, *right, line)
             }
@@ -165,8 +172,8 @@ impl Interpreter {
                 x.$op(y).map_or(
                     Err(RuntimeError::DivisionByZero {
                         op,
-                        left: x,
-                        right: y,
+                        left: Number::Int(x),
+                        right: Number::Int(y),
                         line,
                     }),
                     |x| Ok(Object::Int(x)),
@@ -196,6 +203,58 @@ impl Interpreter {
                 op: InfixOp::LogicalAnd,
                 left: Type::Int,
                 right: Type::Int,
+                line,
+            }),
+        }
+    }
+
+    fn eval_float_infix_expr(&self, op: InfixOp, x: f32, y: f32, line: usize) -> EvalResult {
+        match op {
+            InfixOp::Plus => Ok(Object::Float(x + y)),
+            InfixOp::Minus => Ok(Object::Float(x - y)),
+            InfixOp::Asterisk => Ok(Object::Float(x * y)),
+            InfixOp::Slash => {
+                let result = x / y;
+                if result.is_infinite() {
+                    Err(RuntimeError::DivisionByZero {
+                        op: InfixOp::Slash,
+                        left: Number::Float(x),
+                        right: Number::Float(y),
+                        line,
+                    })
+                } else {
+                    Ok(Object::Float(result))
+                }
+            }
+            InfixOp::Modulo => {
+                let result = x % y;
+                if result.is_nan() {
+                    Err(RuntimeError::DivisionByZero {
+                        op: InfixOp::Modulo,
+                        left: Number::Float(x),
+                        right: Number::Float(y),
+                        line,
+                    })
+                } else {
+                    Ok(Object::Float(result))
+                }
+            }
+            InfixOp::Eq => Ok(Object::Bool(x == y)),
+            InfixOp::NotEq => Ok(Object::Bool(x != y)),
+            InfixOp::Gt => Ok(Object::Bool(x > y)),
+            InfixOp::Lt => Ok(Object::Bool(x < y)),
+            InfixOp::Ge => Ok(Object::Bool(x >= y)),
+            InfixOp::Le => Ok(Object::Bool(x <= y)),
+            InfixOp::LogicalOr => Err(RuntimeError::InvalidBinaryOperand {
+                op: InfixOp::LogicalOr,
+                left: Type::Float,
+                right: Type::Float,
+                line,
+            }),
+            InfixOp::LogicalAnd => Err(RuntimeError::InvalidBinaryOperand {
+                op: InfixOp::LogicalAnd,
+                left: Type::Float,
+                right: Type::Float,
                 line,
             }),
         }
@@ -400,7 +459,13 @@ mod tests {
 
     #[test]
     fn invalid_binary_operands() {
-        let inputs = ["\"test\" + 1;", "False - 3;", "True && 3;", "1 || 1;"];
+        let inputs = [
+            "\"test\" + 1;",
+            "False - 3;",
+            "True && 3;",
+            "1 || 1;",
+            "1.1 && 1.1;",
+        ];
         let errs = [
             RuntimeError::InvalidBinaryOperand {
                 op: InfixOp::Plus,
@@ -426,8 +491,49 @@ mod tests {
                 right: Type::Int,
                 line: 1,
             },
+            RuntimeError::InvalidBinaryOperand {
+                op: InfixOp::LogicalAnd,
+                left: Type::Float,
+                right: Type::Float,
+                line: 1,
+            },
         ];
 
         runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn eval_float_infix_expr() {
+        let inputs = [
+            "1.1 + 2.0;",
+            "4.4 - 1.2;",
+            "2.2 / 2.0;",
+            "2.2 * 2.0;",
+            "2.0 == 1.0;",
+            "3.1 != 4.2;",
+        ];
+        let expecteds = [
+            Object::Float(3.1),
+            Object::Float(3.2),
+            Object::Float(1.1),
+            Object::Float(4.4),
+            Object::Bool(false),
+            Object::Bool(true),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_num_infix_expr_mixed() {
+        let inputs = ["2 * 2.3;", "7.6 - 2;", "4.0 == 4;", "30.0 % 2;"];
+        let expecteds = [
+            Object::Float(4.6),
+            Object::Float(5.6),
+            Object::Bool(true),
+            Object::Float(0.0),
+        ];
+
+        test_eval!(inputs, expecteds)
     }
 }

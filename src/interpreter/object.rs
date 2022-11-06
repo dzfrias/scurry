@@ -62,7 +62,22 @@ impl fmt::Display for Type {
     }
 }
 
-#[derive(Error, Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
+pub enum Number {
+    Int(i32),
+    Float(f32),
+}
+
+impl fmt::Display for Number {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Int(num) => write!(f, "{num}"),
+            Self::Float(num) => write!(f, "{num}"),
+        }
+    }
+}
+
+#[derive(Error, Debug, PartialEq)]
 pub enum RuntimeError {
     #[error("variable not found: {name} on line {line}")]
     VariableNotFound { name: String, line: usize },
@@ -89,8 +104,8 @@ pub enum RuntimeError {
     #[error("division by zero occured in the expression: `{left} {op} {right}` on line {line}")]
     DivisionByZero {
         op: InfixOp,
-        left: i32,
-        right: i32,
+        left: Number,
+        right: Number,
         line: usize,
     },
 }
