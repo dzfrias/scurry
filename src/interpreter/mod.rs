@@ -41,6 +41,7 @@ impl Interpreter {
                 self.env.borrow_mut().set(name.0, val);
                 Ok(Object::Nil)
             }
+            // TODO: Eval if statement
             Stmt::Expr(expr) => self.eval_expr(expr),
             _ => todo!(),
         }
@@ -48,6 +49,7 @@ impl Interpreter {
 
     fn eval_expr(&mut self, expr: Expr) -> EvalResult {
         match expr {
+            // TODO: Eval array literal
             Expr::Literal(Literal::Integer(i)) => Ok(Object::Int(i)),
             Expr::Literal(Literal::Boolean(b)) => Ok(Object::Bool(b)),
             Expr::Literal(Literal::String(s)) => Ok(Object::String(s)),
@@ -224,5 +226,208 @@ impl Interpreter {
 impl Default for Interpreter {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::Parser;
+
+    macro_rules! test_eval {
+        ($inputs:expr, $expecteds:expr) => {
+            for (input, expected) in $inputs.iter().zip($expecteds) {
+                let parser = Parser::new(input);
+                let program = parser.parse().expect("Should have no parser errors");
+                let mut interpreter = Interpreter::new();
+                assert_eq!(
+                    expected,
+                    interpreter
+                        .eval_repl(program)
+                        .expect("Should evaluate with no errors")
+                );
+            }
+        };
+    }
+
+    macro_rules! runtime_error_eval {
+        ($inputs:expr, $errs:expr) => {
+            for (input, err) in $inputs.iter().zip($errs) {
+                let parser = Parser::new(input);
+                let program = parser.parse().expect("Should have no parser errors");
+                let mut interpreter = Interpreter::new();
+                assert_eq!(
+                    err,
+                    interpreter
+                        .eval_repl(program)
+                        .expect_err("Should evaluate with an error")
+                );
+            }
+        };
+    }
+
+    #[test]
+    fn eval_integer_literal() {
+        let inputs = ["1;", "333;"];
+        let expecteds = [Object::Int(1), Object::Int(333)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_float_literal() {
+        let inputs = ["1.3;", "333.333;"];
+        let expecteds = [Object::Float(1.3), Object::Float(333.333)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_string_literal() {
+        let inputs = ["\"test\";", "\"string literal\";"];
+        let expecteds = [
+            Object::String("test".to_owned()),
+            Object::String("string literal".to_owned()),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_boolean_literal() {
+        let inputs = ["True;", "False;"];
+        let expecteds = [Object::Bool(true), Object::Bool(false)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_ident() {
+        let inputs = ["x = 3; x;"];
+        let expecteds = [Object::Int(3)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_integer_prefix_ops() {
+        let inputs = ["-1;", "+2;"];
+        let expecteds = [Object::Int(-1), Object::Int(2)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_boolean_prefix_ops() {
+        let inputs = ["!True;", "!False;"];
+        let expecteds = [Object::Bool(false), Object::Bool(true)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_integer_binary_ops() {
+        let inputs = [
+            "1 + 1;", "2 - 2;", "3 * 3;", "4 / 4;", "20 % 2;", "3 == 3;", "4 != 4;", "10 > 3;",
+            "6 < 0;", "30 >= 9;", "7 <= 7;",
+        ];
+        let expecteds = [
+            Object::Int(2),
+            Object::Int(0),
+            Object::Int(9),
+            Object::Int(1),
+            Object::Int(0),
+            Object::Bool(true),
+            Object::Bool(false),
+            Object::Bool(true),
+            Object::Bool(false),
+            Object::Bool(true),
+            Object::Bool(true),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_boolean_binary_ops() {
+        let inputs = [
+            "True == True;",
+            "False != True;",
+            "True && False;",
+            "False || True;",
+        ];
+        let expecteds = [
+            Object::Bool(true),
+            Object::Bool(true),
+            Object::Bool(false),
+            Object::Bool(true),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_string_binary_ops() {
+        let inputs = ["\"test\" == \"test\";", "\"testing\" != \"testing\";"];
+        let expecteds = [Object::Bool(true), Object::Bool(false)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn invalid_unary_operands() {
+        let inputs = ["-True;", "!3;", "+False;"];
+        let errs = [
+            RuntimeError::InvalidUnaryOperand {
+                op: PrefixOp::Minus,
+                operand: Type::Bool,
+                line: 1,
+            },
+            RuntimeError::InvalidUnaryOperand {
+                op: PrefixOp::Bang,
+                operand: Type::Int,
+                line: 1,
+            },
+            RuntimeError::InvalidUnaryOperand {
+                op: PrefixOp::Plus,
+                operand: Type::Bool,
+                line: 1,
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn invalid_binary_operands() {
+        let inputs = ["\"test\" + 1;", "False - 3;", "True && 3;", "1 || 1;"];
+        let errs = [
+            RuntimeError::InvalidBinaryOperand {
+                op: InfixOp::Plus,
+                left: Type::String,
+                right: Type::Int,
+                line: 1,
+            },
+            RuntimeError::InvalidBinaryOperand {
+                op: InfixOp::Minus,
+                left: Type::Bool,
+                right: Type::Int,
+                line: 1,
+            },
+            RuntimeError::InvalidBinaryOperand {
+                op: InfixOp::LogicalAnd,
+                left: Type::Bool,
+                right: Type::Int,
+                line: 1,
+            },
+            RuntimeError::InvalidBinaryOperand {
+                op: InfixOp::LogicalOr,
+                left: Type::Int,
+                right: Type::Int,
+                line: 1,
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
     }
 }
