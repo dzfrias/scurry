@@ -50,6 +50,11 @@ impl Interpreter {
                 Ok(Object::Nil)
             }
             Stmt::While(WhileStmt { condition, block }) => self.eval_while_stmt(condition, block),
+            Stmt::For(ForStmt {
+                iter_ident,
+                expr,
+                block,
+            }) => self.eval_for_stmt(iter_ident, expr, block),
             Stmt::If(IfStmt {
                 condition,
                 true_block,
@@ -424,6 +429,40 @@ impl Interpreter {
             self.eval_block(block.clone())?
         }
         Ok(Object::Nil)
+    }
+
+    fn eval_for_stmt(&mut self, iter_ident: Ident, expr: Expr, block: Block) -> EvalResult {
+        let obj = self.eval_expr(expr)?;
+        match obj {
+            Object::Array(arr) => {
+                for obj in arr.borrow().iter() {
+                    self.env.borrow_mut().set(iter_ident.0.clone(), obj.clone());
+                    self.eval_block(block.clone())?
+                }
+                Ok(Object::Nil)
+            }
+            Object::Map(map) => {
+                for (key, _) in map.borrow().iter() {
+                    self.env.borrow_mut().set(iter_ident.0.clone(), key.clone());
+                    self.eval_block(block.clone())?
+                }
+                Ok(Object::Nil)
+            }
+            Object::String(string) => {
+                for char in string.chars() {
+                    self.env
+                        .borrow_mut()
+                        .set(iter_ident.0.clone(), Object::String(char.to_string()));
+                    self.eval_block(block.clone())?
+                }
+                Ok(Object::Nil)
+            }
+            _ => Err(RuntimeError::CannotIterate {
+                obj: obj.scurry_type(),
+                // TODO: Line numbers
+                line: 1,
+            }),
+        }
     }
 }
 
@@ -846,5 +885,42 @@ mod tests {
         let expecteds = [Object::Int(3), Object::Int(2)];
 
         test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_for_stmt() {
+        let inputs = [
+            "for x in [1, 2, 3] { y = x; }; y;",
+            "for x in {44: 3} { y = x; }; y;",
+            "for x in \"test\" { y = x; }; y;",
+        ];
+        let expecteds = [
+            Object::Int(3),
+            Object::Int(44),
+            Object::String("t".to_owned()),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn cannot_iterate_through_some_types() {
+        let inputs = ["for x in 1 {}", "for x in True {}", "for x in 3.3 {}"];
+        let errs = [
+            RuntimeError::CannotIterate {
+                obj: Type::Int,
+                line: 1,
+            },
+            RuntimeError::CannotIterate {
+                obj: Type::Bool,
+                line: 1,
+            },
+            RuntimeError::CannotIterate {
+                obj: Type::Float,
+                line: 1,
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
     }
 }

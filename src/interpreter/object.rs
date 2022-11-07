@@ -198,6 +198,8 @@ pub enum RuntimeError {
     IndexOperatorNotSupported { obj: Type, index_type: Type },
     #[error("key (`{key}`) not in map: `{obj}`")]
     KeyNotFound { obj: Object, key: Object },
+    #[error("cannot iterate through object of type `{obj}`")]
+    CannotIterate { obj: Type, line: usize },
 }
 
 pub type EvalResult = Result<Object, RuntimeError>;
