@@ -15,6 +15,8 @@ pub enum Token {
     True,
     #[token("False")]
     False,
+    #[token("Nil")]
+    Nil,
 
     #[token("=")]
     Assign,
@@ -126,6 +128,7 @@ impl fmt::Display for Token {
             Token::String(_) => write!(f, "STRING"),
             Token::True => write!(f, "BOOLEAN"),
             Token::False => write!(f, "BOOLEAN"),
+            Token::Nil => write!(f, "NIL"),
             Token::Assign => write!(f, "="),
             Token::Plus => write!(f, "+"),
             Token::Minus => write!(f, "-"),
@@ -484,6 +487,12 @@ mod tests {
     fn tokenizes_case() {
         let mut lexer = Token::lexer("case");
         assert_eq!(Token::Case, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_nil() {
+        let mut lexer = Token::lexer("Nil");
+        assert_eq!(Token::Nil, lexer.next().expect("Should lex something"));
     }
 
     #[test]

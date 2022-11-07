@@ -79,7 +79,7 @@ impl fmt::Display for Type {
             Self::Bool => write!(f, "Bool"),
             Self::String => write!(f, "String"),
             Self::Array => write!(f, "Array"),
-            Self::Nil => write!(f, "nil"),
+            Self::Nil => write!(f, "Nil"),
         }
     }
 }

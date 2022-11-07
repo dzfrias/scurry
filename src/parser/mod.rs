@@ -278,6 +278,7 @@ impl<'a> Parser<'a> {
             Token::Float(f) => Expr::Literal(Literal::Float(f)),
             Token::True => Expr::Literal(Literal::Boolean(true)),
             Token::False => Expr::Literal(Literal::Boolean(false)),
+            Token::Nil => Expr::Literal(Literal::Nil),
             Token::Lbracket => {
                 Expr::Literal(Literal::Array(self.parse_expr_list(Token::Rbracket)?))
             }
@@ -753,12 +754,13 @@ mod tests {
 
     #[test]
     fn parse_literal_exprs() {
-        let inputs = ["123;", "3.3;", "\"test\";", "True;"];
+        let inputs = ["123;", "3.3;", "\"test\";", "True;", "Nil;"];
         let expecteds = [
             Stmt::Expr(Expr::Literal(Literal::Integer(123))),
             Stmt::Expr(Expr::Literal(Literal::Float(3.3))),
             Stmt::Expr(Expr::Literal(Literal::String("test".to_owned()))),
             Stmt::Expr(Expr::Literal(Literal::Boolean(true))),
+            Stmt::Expr(Expr::Literal(Literal::Nil)),
         ];
 
         test_parse!(inputs, expecteds)

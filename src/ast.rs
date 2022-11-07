@@ -131,6 +131,7 @@ impl fmt::Display for IndexExpr {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
+    Nil,
     Integer(i32),
     Boolean(bool),
     String(String),
@@ -142,6 +143,7 @@ pub enum Literal {
 impl fmt::Display for Literal {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Nil => write!(f, "Nil"),
             Self::Integer(i) => write!(f, "{i}"),
             Self::Float(float) => write!(f, "{float}"),
             Self::Boolean(b) => write!(f, "{}", {

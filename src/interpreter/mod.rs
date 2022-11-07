@@ -61,6 +61,7 @@ impl Interpreter {
 
     fn eval_expr(&mut self, expr: Expr) -> EvalResult {
         match expr {
+            Expr::Literal(Literal::Nil) => Ok(Object::Nil),
             Expr::Literal(Literal::Integer(i)) => Ok(Object::Int(i)),
             Expr::Literal(Literal::Boolean(b)) => Ok(Object::Bool(b)),
             Expr::Literal(Literal::String(s)) => Ok(Object::String(s)),
