@@ -73,6 +73,11 @@ impl Interpreter {
                 Ok(Object::Array(array))
             }
             Expr::Ident(Ident(name)) => self.eval_ident(&name),
+            Expr::Index(IndexExpr { left, index }) => {
+                let expr = self.eval_expr(*left)?;
+                let index = self.eval_expr(*index)?;
+                self.eval_index_expr(expr, index)
+            }
             Expr::Prefix(PrefixExpr { left, op, line }) => {
                 let left = self.eval_expr(*left)?;
                 self.eval_prefix_expr(op, left, line)
@@ -337,6 +342,53 @@ impl Interpreter {
             }
         }
         Ok(Object::Nil)
+    }
+
+    fn eval_index_expr(&mut self, obj: Object, index: Object) -> EvalResult {
+        match (&obj, &index) {
+            (Object::Array(arr), Object::Int(i)) => {
+                if arr.is_empty() {
+                    return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
+                }
+                if *i < 0 {
+                    if i.abs() as usize > arr.len() {
+                        return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
+                    }
+                    return match arr.iter().rev().take(i.abs() as usize).last() {
+                        Some(item) => Ok(item.clone()),
+                        None => Err(RuntimeError::IndexOutOfRange { obj, index: *i }),
+                    };
+                }
+                let idx = *i as usize;
+                if idx > arr.len() - 1 {
+                    Err(RuntimeError::IndexOutOfRange { obj, index: *i })
+                } else {
+                    Ok(arr[idx].clone())
+                }
+            }
+            (Object::String(s), Object::Int(i)) => {
+                if s.is_empty() {
+                    return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
+                }
+                if *i < 0 {
+                    if i.abs() as usize > s.len() {
+                        return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
+                    }
+                    return match s.chars().rev().take(i.abs() as usize).last() {
+                        Some(item) => Ok(Object::String(item.to_string())),
+                        None => Err(RuntimeError::IndexOutOfRange { obj, index: *i }),
+                    };
+                }
+                match s.chars().nth(*i as usize) {
+                    Some(c) => Ok(Object::String(c.to_string())),
+                    None => Err(RuntimeError::IndexOutOfRange { obj, index: *i }),
+                }
+            }
+            _ => Err(RuntimeError::IndexOperatorOutOfRange {
+                obj: obj.scurry_type(),
+                index_type: index.scurry_type(),
+            }),
+        }
     }
 }
 
@@ -626,5 +678,79 @@ mod tests {
         let expecteds = [Object::Int(3), Object::Int(3), Object::Int(3), Object::Nil];
 
         test_eval!(inputs, expecteds);
+    }
+
+    #[test]
+    fn eval_array_index_expr() {
+        let inputs = [
+            "[1, 2, 3][1];",
+            "[1, 2, 3][-1];",
+            "[1, 2, 3][0];",
+            "[1, 2, 3][-1];",
+            "[1, 2, 3][-2];",
+        ];
+        let expecteds = [
+            Object::Int(2),
+            Object::Int(3),
+            Object::Int(1),
+            Object::Int(3),
+            Object::Int(2),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn array_out_of_range_indices() {
+        let inputs = ["[1, 2, 3][3];", "[][0];", "[1, 2, 3][-4];"];
+        let errs = [
+            RuntimeError::IndexOutOfRange {
+                obj: Object::Array(vec![Object::Int(1), Object::Int(2), Object::Int(3)]),
+                index: 3,
+            },
+            RuntimeError::IndexOutOfRange {
+                obj: Object::Array(Vec::new()),
+                index: 0,
+            },
+            RuntimeError::IndexOutOfRange {
+                obj: Object::Array(vec![Object::Int(1), Object::Int(2), Object::Int(3)]),
+                index: -4,
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn eval_string_index_expr() {
+        let inputs = ["\"test\"[0];", "\"test\"[2];", "\"test\"[-1];"];
+        let expecteds = [
+            Object::String("t".to_owned()),
+            Object::String("s".to_owned()),
+            Object::String("t".to_owned()),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn string_out_of_range_indices() {
+        let inputs = ["\"test\"[10];", "\"test\"[-10];", "\"\"[0];"];
+        let errs = [
+            RuntimeError::IndexOutOfRange {
+                obj: Object::String("test".to_owned()),
+                index: 10,
+            },
+            RuntimeError::IndexOutOfRange {
+                obj: Object::String("test".to_owned()),
+                index: -10,
+            },
+            RuntimeError::IndexOutOfRange {
+                obj: Object::String("".to_owned()),
+                index: 0,
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
     }
 }

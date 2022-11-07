@@ -130,6 +130,10 @@ pub enum RuntimeError {
         right: Number,
         line: usize,
     },
+    #[error("index of `{index}` out of range in array `{obj}`")]
+    IndexOutOfRange { obj: Object, index: i32 },
+    #[error("index operator not supported between `{obj}` and `{index_type}`")]
+    IndexOperatorOutOfRange { obj: Type, index_type: Type },
 }
 
 pub type EvalResult = Result<Object, RuntimeError>;
