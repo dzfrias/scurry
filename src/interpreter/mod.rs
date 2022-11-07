@@ -352,10 +352,16 @@ impl Interpreter {
                     return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
                 }
                 if *i < 0 {
-                    if i.abs() as usize > arr.borrow().len() {
+                    if i.unsigned_abs() as usize > arr.borrow().len() {
                         return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
                     }
-                    return match arr.borrow().iter().rev().take(i.abs() as usize).last() {
+                    return match arr
+                        .borrow()
+                        .iter()
+                        .rev()
+                        .take(i.unsigned_abs() as usize)
+                        .last()
+                    {
                         Some(item) => Ok(item.clone()),
                         None => Err(RuntimeError::IndexOutOfRange {
                             obj: obj.clone(),
@@ -375,10 +381,10 @@ impl Interpreter {
                     return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
                 }
                 if *i < 0 {
-                    if i.abs() as usize > s.len() {
+                    if i.unsigned_abs() as usize > s.len() {
                         return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
                     }
-                    return match s.chars().rev().take(i.abs() as usize).last() {
+                    return match s.chars().rev().take(i.unsigned_abs() as usize).last() {
                         Some(item) => Ok(Object::String(item.to_string())),
                         None => Err(RuntimeError::IndexOutOfRange { obj, index: *i }),
                     };

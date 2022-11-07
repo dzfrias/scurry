@@ -30,9 +30,9 @@ pub enum Object {
 impl Clone for Object {
     fn clone(&self) -> Self {
         match self {
-            Self::Int(i) => Object::Int(i.clone()),
-            Self::Float(f) => Object::Float(f.clone()),
-            Self::Bool(b) => Object::Bool(b.clone()),
+            Self::Int(i) => Object::Int(*i),
+            Self::Float(f) => Object::Float(*f),
+            Self::Bool(b) => Object::Bool(*b),
             Self::String(s) => Object::String(s.clone()),
             Self::Nil => Object::Nil,
 
