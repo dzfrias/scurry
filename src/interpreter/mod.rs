@@ -614,4 +614,17 @@ mod tests {
 
         test_eval!(inputs, expecteds)
     }
+
+    #[test]
+    fn eval_if_stmt() {
+        let inputs = [
+            "if True { x = 3; }; x;",
+            "if False {} else { x = 3; }; x;",
+            "if False {} elif True { x = 3; } else {}; x;",
+            "if False {} elif False {} elif False {} else {}",
+        ];
+        let expecteds = [Object::Int(3), Object::Int(3), Object::Int(3), Object::Nil];
+
+        test_eval!(inputs, expecteds);
+    }
 }
