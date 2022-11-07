@@ -61,11 +61,17 @@ impl Interpreter {
 
     fn eval_expr(&mut self, expr: Expr) -> EvalResult {
         match expr {
-            // TODO: Eval array literal
             Expr::Literal(Literal::Integer(i)) => Ok(Object::Int(i)),
             Expr::Literal(Literal::Boolean(b)) => Ok(Object::Bool(b)),
             Expr::Literal(Literal::String(s)) => Ok(Object::String(s)),
             Expr::Literal(Literal::Float(f)) => Ok(Object::Float(f)),
+            Expr::Literal(Literal::Array(arr)) => {
+                let mut array = Vec::new();
+                for expr in arr {
+                    array.push(self.eval_expr(expr)?);
+                }
+                Ok(Object::Array(array))
+            }
             Expr::Ident(Ident(name)) => self.eval_ident(&name),
             Expr::Prefix(PrefixExpr { left, op, line }) => {
                 let left = self.eval_expr(*left)?;
@@ -408,6 +414,18 @@ mod tests {
     fn eval_boolean_literal() {
         let inputs = ["True;", "False;"];
         let expecteds = [Object::Bool(true), Object::Bool(false)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_array_literal() {
+        let inputs = ["[1, 2, 3];"];
+        let expecteds = [Object::Array(vec![
+            Object::Int(1),
+            Object::Int(2),
+            Object::Int(3),
+        ])];
 
         test_eval!(inputs, expecteds)
     }

@@ -8,6 +8,7 @@ pub enum Object {
     Float(f32),
     Bool(bool),
     String(String),
+    Array(Vec<Object>),
     Nil,
 }
 
@@ -18,6 +19,7 @@ impl Object {
             Self::Float(_) => Type::Float,
             Self::Bool(_) => Type::Bool,
             Self::String(_) => Type::String,
+            Self::Array(_) => Type::Array,
             Self::Nil => Type::Nil,
         }
     }
@@ -27,7 +29,8 @@ impl Object {
             Self::Int(i) => *i != 0,
             Self::Float(f) => *f != 0.0,
             Self::Bool(b) => *b,
-            Self::String(s) => s.is_empty(),
+            Self::String(s) => !s.is_empty(),
+            Self::Array(arr) => !arr.is_empty(),
             Self::Nil => false,
         }
     }
@@ -46,6 +49,13 @@ impl fmt::Display for Object {
                 }
             }),
             Self::String(s) => write!(f, "{}", s),
+            Self::Array(arr) => {
+                let joined = arr
+                    .iter()
+                    .map(|elem| elem.to_string() + ", ")
+                    .collect::<String>();
+                write!(f, "[{}]", joined.strip_suffix(", ").unwrap_or_default())
+            }
             Self::Nil => write!(f, "nil"),
         }
     }
@@ -58,6 +68,7 @@ pub enum Type {
     Bool,
     String,
     Nil,
+    Array,
 }
 
 impl fmt::Display for Type {
@@ -67,6 +78,7 @@ impl fmt::Display for Type {
             Self::Float => write!(f, "Float"),
             Self::Bool => write!(f, "Bool"),
             Self::String => write!(f, "String"),
+            Self::Array => write!(f, "Array"),
             Self::Nil => write!(f, "nil"),
         }
     }
