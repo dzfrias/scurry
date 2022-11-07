@@ -1,7 +1,7 @@
 use crate::lexer::Token;
 use core::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
     Ident(Ident),
     Literal(Literal),
@@ -28,7 +28,7 @@ impl fmt::Display for Expr {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct InfixExpr {
     pub left: Box<Expr>,
     pub op: InfixOp,
@@ -42,7 +42,7 @@ impl fmt::Display for InfixExpr {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct PrefixExpr {
     pub left: Box<Expr>,
     pub op: PrefixOp,
@@ -55,7 +55,7 @@ impl fmt::Display for PrefixExpr {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DotExpr {
     pub left: Box<Expr>,
     pub field: Ident,
@@ -68,7 +68,7 @@ impl fmt::Display for DotExpr {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionExpr {
     pub params: Vec<Ident>,
     pub block: Block,
@@ -95,7 +95,7 @@ impl fmt::Display for FunctionExpr {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CallExpr {
     pub func: Box<Expr>,
     pub args: Vec<Expr>,
@@ -117,7 +117,7 @@ impl fmt::Display for CallExpr {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IndexExpr {
     pub left: Box<Expr>,
     pub index: Box<Expr>,
@@ -129,7 +129,7 @@ impl fmt::Display for IndexExpr {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     Integer(i32),
     Boolean(bool),
@@ -260,7 +260,7 @@ impl fmt::Display for PrefixOp {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Ident(pub String);
 
 impl fmt::Display for Ident {
@@ -269,7 +269,7 @@ impl fmt::Display for Ident {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Stmt {
     Assign(AssignStmt),
     If(IfStmt),
@@ -306,7 +306,7 @@ impl fmt::Display for Stmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct AssignStmt {
     pub name: Ident,
     pub value: Expr,
@@ -318,7 +318,7 @@ impl fmt::Display for AssignStmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ReturnStmt {
     pub value: Expr,
 }
@@ -329,7 +329,7 @@ impl fmt::Display for ReturnStmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct IfStmt {
     pub condition: Expr,
     pub true_block: Block,
@@ -350,7 +350,7 @@ impl fmt::Display for IfStmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ElifStmt {
     pub condition: Expr,
     pub block: Block,
@@ -362,7 +362,7 @@ impl fmt::Display for ElifStmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct ForStmt {
     pub iter_ident: Ident,
     pub expr: Expr,
@@ -375,7 +375,7 @@ impl fmt::Display for ForStmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct WhileStmt {
     pub condition: Expr,
     pub block: Block,
@@ -387,7 +387,7 @@ impl fmt::Display for WhileStmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionStmt {
     pub name: Ident,
     pub params: Vec<Ident>,
@@ -411,7 +411,7 @@ impl fmt::Display for FunctionStmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct SwitchStmt {
     pub expr: Expr,
     pub cases: Vec<Case>,
@@ -436,7 +436,7 @@ impl fmt::Display for SwitchStmt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Case {
     pub conditions: Vec<Expr>,
     pub block: Block,
@@ -460,7 +460,7 @@ impl fmt::Display for Case {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct DeclarationStmt {
     pub name: Ident,
     pub methods: Vec<FunctionStmt>,
@@ -492,7 +492,7 @@ impl fmt::Display for DeclarationStmt {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Embed {
     pub name: Ident,
     pub assigned: Vec<Ident>,
@@ -512,7 +512,7 @@ impl fmt::Display for Embed {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Block(pub Vec<Stmt>);
 
 impl fmt::Display for Block {

@@ -21,6 +21,16 @@ impl Object {
             Self::Nil => Type::Nil,
         }
     }
+
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Self::Int(i) => *i != 0,
+            Self::Float(f) => *f != 0.0,
+            Self::Bool(b) => *b,
+            Self::String(s) => s.is_empty(),
+            Self::Nil => false,
+        }
+    }
 }
 
 impl fmt::Display for Object {

@@ -34,6 +34,13 @@ impl Interpreter {
         Ok(result)
     }
 
+    fn eval_block(&mut self, block: Block) -> Result<(), RuntimeError> {
+        for stmt in block.0 {
+            self.eval_stmt(stmt)?;
+        }
+        Ok(())
+    }
+
     fn eval_stmt(&mut self, stmt: Stmt) -> EvalResult {
         match stmt {
             Stmt::Assign(AssignStmt { name, value }) => {
@@ -41,8 +48,13 @@ impl Interpreter {
                 self.env.borrow_mut().set(name.0, val);
                 Ok(Object::Nil)
             }
-            // TODO: Eval if statement
             Stmt::Expr(expr) => self.eval_expr(expr),
+            Stmt::If(IfStmt {
+                condition,
+                true_block,
+                else_block,
+                elifs,
+            }) => self.eval_if_stmt(condition, true_block, else_block, elifs),
             _ => todo!(),
         }
     }
@@ -296,6 +308,29 @@ impl Interpreter {
                 line,
             }),
         }
+    }
+
+    fn eval_if_stmt(
+        &mut self,
+        condition: Expr,
+        true_block: Block,
+        else_block: Option<Block>,
+        elifs: Vec<ElifStmt>,
+    ) -> EvalResult {
+        if self.eval_expr(condition)?.is_truthy() {
+            self.eval_block(true_block)?;
+        } else {
+            for elif in elifs {
+                if self.eval_expr(elif.condition)?.is_truthy() {
+                    self.eval_block(elif.block)?;
+                    return Ok(Object::Nil);
+                }
+            }
+            if let Some(block) = else_block {
+                self.eval_block(block)?;
+            }
+        }
+        Ok(Object::Nil)
     }
 }
 
