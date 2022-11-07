@@ -1,15 +1,44 @@
 use crate::ast::*;
+use std::cell::RefCell;
 use std::fmt;
+use std::rc::Rc;
 use thiserror::Error;
 
-#[derive(Debug, PartialEq, Clone)]
+#[allow(unused_macros)]
+macro_rules! array {
+    ($($elem:expr),+ $(,)?) => {
+        {
+            let mut vector = Vec::new();
+            $(vector.push($elem);)*
+            Object::Array(Rc::new(RefCell::new(vector)))
+        }
+    };
+}
+#[allow(unused_imports)]
+pub(crate) use array;
+
+#[derive(Debug, PartialEq)]
 pub enum Object {
     Int(i32),
     Float(f32),
     Bool(bool),
     String(String),
-    Array(Vec<Object>),
+    Array(Rc<RefCell<Vec<Object>>>),
     Nil,
+}
+
+impl Clone for Object {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Int(i) => Object::Int(i.clone()),
+            Self::Float(f) => Object::Float(f.clone()),
+            Self::Bool(b) => Object::Bool(b.clone()),
+            Self::String(s) => Object::String(s.clone()),
+            Self::Nil => Object::Nil,
+
+            Self::Array(arr) => Object::Array(Rc::clone(arr)),
+        }
+    }
 }
 
 impl Object {
@@ -30,7 +59,7 @@ impl Object {
             Self::Float(f) => *f != 0.0,
             Self::Bool(b) => *b,
             Self::String(s) => !s.is_empty(),
-            Self::Array(arr) => !arr.is_empty(),
+            Self::Array(arr) => !arr.borrow().is_empty(),
             Self::Nil => false,
         }
     }
@@ -51,6 +80,7 @@ impl fmt::Display for Object {
             Self::String(s) => write!(f, "{}", s),
             Self::Array(arr) => {
                 let joined = arr
+                    .borrow()
                     .iter()
                     .map(|elem| elem.to_string() + ", ")
                     .collect::<String>();

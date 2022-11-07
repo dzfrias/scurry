@@ -71,7 +71,7 @@ impl Interpreter {
                 for expr in arr {
                     array.push(self.eval_expr(expr)?);
                 }
-                Ok(Object::Array(array))
+                Ok(Object::Array(Rc::new(RefCell::new(array))))
             }
             Expr::Ident(Ident(name)) => self.eval_ident(&name),
             Expr::Index(IndexExpr { left, index }) => {
@@ -348,23 +348,26 @@ impl Interpreter {
     fn eval_index_expr(&mut self, obj: Object, index: Object) -> EvalResult {
         match (&obj, &index) {
             (Object::Array(arr), Object::Int(i)) => {
-                if arr.is_empty() {
+                if arr.borrow().is_empty() {
                     return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
                 }
                 if *i < 0 {
-                    if i.abs() as usize > arr.len() {
+                    if i.abs() as usize > arr.borrow().len() {
                         return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
                     }
-                    return match arr.iter().rev().take(i.abs() as usize).last() {
+                    return match arr.borrow().iter().rev().take(i.abs() as usize).last() {
                         Some(item) => Ok(item.clone()),
-                        None => Err(RuntimeError::IndexOutOfRange { obj, index: *i }),
+                        None => Err(RuntimeError::IndexOutOfRange {
+                            obj: obj.clone(),
+                            index: *i,
+                        }),
                     };
                 }
                 let idx = *i as usize;
-                if idx > arr.len() - 1 {
+                if idx > arr.borrow().len() - 1 {
                     Err(RuntimeError::IndexOutOfRange { obj, index: *i })
                 } else {
-                    Ok(arr[idx].clone())
+                    Ok(arr.borrow()[idx].clone())
                 }
             }
             (Object::String(s), Object::Int(i)) => {
@@ -474,11 +477,7 @@ mod tests {
     #[test]
     fn eval_array_literal() {
         let inputs = ["[1, 2, 3];"];
-        let expecteds = [Object::Array(vec![
-            Object::Int(1),
-            Object::Int(2),
-            Object::Int(3),
-        ])];
+        let expecteds = [array![Object::Int(1), Object::Int(2), Object::Int(3)]];
 
         test_eval!(inputs, expecteds)
     }
@@ -706,15 +705,15 @@ mod tests {
         let inputs = ["[1, 2, 3][3];", "[][0];", "[1, 2, 3][-4];"];
         let errs = [
             RuntimeError::IndexOutOfRange {
-                obj: Object::Array(vec![Object::Int(1), Object::Int(2), Object::Int(3)]),
+                obj: array![Object::Int(1), Object::Int(2), Object::Int(3)],
                 index: 3,
             },
             RuntimeError::IndexOutOfRange {
-                obj: Object::Array(Vec::new()),
+                obj: Object::Array(Rc::new(RefCell::new(Vec::new()))),
                 index: 0,
             },
             RuntimeError::IndexOutOfRange {
-                obj: Object::Array(vec![Object::Int(1), Object::Int(2), Object::Int(3)]),
+                obj: array![Object::Int(1), Object::Int(2), Object::Int(3)],
                 index: -4,
             },
         ];
