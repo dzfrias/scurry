@@ -49,13 +49,14 @@ impl Interpreter {
                 self.env.borrow_mut().set(name.0, val);
                 Ok(Object::Nil)
             }
-            Stmt::Expr(expr) => self.eval_expr(expr),
+            Stmt::While(WhileStmt { condition, block }) => self.eval_while_stmt(condition, block),
             Stmt::If(IfStmt {
                 condition,
                 true_block,
                 else_block,
                 elifs,
             }) => self.eval_if_stmt(condition, true_block, else_block, elifs),
+            Stmt::Expr(expr) => self.eval_expr(expr),
             _ => todo!(),
         }
     }
@@ -416,6 +417,13 @@ impl Interpreter {
                 index_type: index.scurry_type(),
             }),
         }
+    }
+
+    fn eval_while_stmt(&mut self, condition: Expr, block: Block) -> EvalResult {
+        while self.eval_expr(condition.clone())?.is_truthy() {
+            self.eval_block(block.clone())?
+        }
+        Ok(Object::Nil)
     }
 }
 
@@ -827,5 +835,16 @@ mod tests {
         ];
 
         runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn eval_while_statement() {
+        let inputs = [
+            "x = 0; while x != 3 { x = x + 1; }; x;",
+            "x = 2; while False { x = 0; }; x;",
+        ];
+        let expecteds = [Object::Int(3), Object::Int(2)];
+
+        test_eval!(inputs, expecteds)
     }
 }
