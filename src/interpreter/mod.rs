@@ -776,4 +776,56 @@ mod tests {
 
         runtime_error_eval!(inputs, errs)
     }
+
+    #[test]
+    fn eval_map_literal() {
+        let inputs = ["{1: 2, \"test\": 3, True: 33};", "{}"];
+        let map = {
+            let mut map = HashMap::new();
+            map.insert(Object::Int(1), Object::Int(2));
+            map.insert(Object::String("test".to_owned()), Object::Int(3));
+            map.insert(Object::Bool(true), Object::Int(33));
+            map
+        };
+        let expecteds = [
+            Object::Map(Rc::new(RefCell::new(map))),
+            Object::Map(Rc::new(RefCell::new(HashMap::new()))),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn map_index_expr() {
+        let inputs = [
+            "{43: 33}[43];",
+            "{\"test\": 44}[\"test\"];",
+            "{True: 2}[True];",
+        ];
+        let expecteds = [Object::Int(33), Object::Int(44), Object::Int(2)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn invalid_key_in_map_index_expr() {
+        let inputs = ["{}[44];", "{1: 3}[33];"];
+        let map = {
+            let mut map = HashMap::new();
+            map.insert(Object::Int(1), Object::Int(3));
+            map
+        };
+        let errs = [
+            RuntimeError::KeyNotFound {
+                obj: Object::Map(Rc::new(RefCell::new(HashMap::new()))),
+                key: Object::Int(44),
+            },
+            RuntimeError::KeyNotFound {
+                obj: Object::Map(Rc::new(RefCell::new(map))),
+                key: Object::Int(33),
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
+    }
 }
