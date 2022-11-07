@@ -1,6 +1,8 @@
 use crate::ast::*;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::fmt;
+use std::hash::Hash;
 use std::rc::Rc;
 use thiserror::Error;
 
@@ -24,6 +26,7 @@ pub enum Object {
     Bool(bool),
     String(String),
     Array(Rc<RefCell<Vec<Object>>>),
+    Map(Rc<RefCell<HashMap<Object, Object>>>),
     Nil,
 }
 
@@ -36,9 +39,26 @@ impl Clone for Object {
             Self::String(s) => Object::String(s.clone()),
             Self::Nil => Object::Nil,
 
+            Self::Map(map) => Object::Map(Rc::clone(map)),
             Self::Array(arr) => Object::Array(Rc::clone(arr)),
         }
     }
+}
+
+impl Hash for Object {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Int(i) => i.hash(state),
+            Self::Bool(b) => b.hash(state),
+            Self::String(s) => s.hash(state),
+            _ => "".hash(state),
+        }
+    }
+}
+
+// There are no NaNs or Infinites in Scurry
+impl Eq for Object {
+    fn assert_receiver_is_total_eq(&self) {}
 }
 
 impl Object {
@@ -49,6 +69,7 @@ impl Object {
             Self::Bool(_) => Type::Bool,
             Self::String(_) => Type::String,
             Self::Array(_) => Type::Array,
+            Self::Map(_) => Type::Map,
             Self::Nil => Type::Nil,
         }
     }
@@ -60,6 +81,7 @@ impl Object {
             Self::Bool(b) => *b,
             Self::String(s) => !s.is_empty(),
             Self::Array(arr) => !arr.borrow().is_empty(),
+            Self::Map(map) => !map.borrow().is_empty(),
             Self::Nil => false,
         }
     }
@@ -86,6 +108,14 @@ impl fmt::Display for Object {
                     .collect::<String>();
                 write!(f, "[{}]", joined.strip_suffix(", ").unwrap_or_default())
             }
+            Self::Map(map) => {
+                let pairs = map
+                    .borrow()
+                    .iter()
+                    .map(|(key, val)| key.to_string() + ": " + &val.to_string() + ", ")
+                    .collect::<String>();
+                write!(f, "{{{}}}", pairs.strip_suffix(", ").unwrap_or_default())
+            }
             Self::Nil => write!(f, "nil"),
         }
     }
@@ -99,6 +129,7 @@ pub enum Type {
     String,
     Nil,
     Array,
+    Map,
 }
 
 impl fmt::Display for Type {
@@ -110,6 +141,7 @@ impl fmt::Display for Type {
             Self::String => write!(f, "String"),
             Self::Array => write!(f, "Array"),
             Self::Nil => write!(f, "Nil"),
+            Self::Map => write!(f, "Map"),
         }
     }
 }
@@ -163,7 +195,9 @@ pub enum RuntimeError {
     #[error("index of `{index}` out of range in array `{obj}`")]
     IndexOutOfRange { obj: Object, index: i32 },
     #[error("index operator not supported between `{obj}` and `{index_type}`")]
-    IndexOperatorOutOfRange { obj: Type, index_type: Type },
+    IndexOperatorNotSupported { obj: Type, index_type: Type },
+    #[error("key (`{key}`) not in map: `{obj}`")]
+    KeyNotFound { obj: Object, key: Object },
 }
 
 pub type EvalResult = Result<Object, RuntimeError>;

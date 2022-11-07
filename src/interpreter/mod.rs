@@ -5,6 +5,7 @@ use self::env::Env;
 use self::object::*;
 use crate::ast::*;
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 
 #[derive(Debug)]
@@ -72,6 +73,13 @@ impl Interpreter {
                     array.push(self.eval_expr(expr)?);
                 }
                 Ok(Object::Array(Rc::new(RefCell::new(array))))
+            }
+            Expr::Literal(Literal::Map(map)) => {
+                let mut pairs = HashMap::new();
+                for (key, value) in map {
+                    pairs.insert(self.eval_expr(key)?, self.eval_expr(value)?);
+                }
+                Ok(Object::Map(Rc::new(RefCell::new(pairs))))
             }
             Expr::Ident(Ident(name)) => self.eval_ident(&name),
             Expr::Index(IndexExpr { left, index }) => {
@@ -394,7 +402,16 @@ impl Interpreter {
                     None => Err(RuntimeError::IndexOutOfRange { obj, index: *i }),
                 }
             }
-            _ => Err(RuntimeError::IndexOperatorOutOfRange {
+            (Object::Map(map), Object::Int(_) | Object::Bool(_) | Object::String(_)) => {
+                match map.borrow().get(&index) {
+                    Some(obj) => Ok(obj.clone()),
+                    None => Err(RuntimeError::KeyNotFound {
+                        obj: obj.clone(),
+                        key: index,
+                    }),
+                }
+            }
+            _ => Err(RuntimeError::IndexOperatorNotSupported {
                 obj: obj.scurry_type(),
                 index_type: index.scurry_type(),
             }),
