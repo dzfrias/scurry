@@ -192,12 +192,24 @@ pub enum RuntimeError {
         right: Number,
         line: usize,
     },
-    #[error("index of `{index}` out of range in array `{obj}`")]
-    IndexOutOfRange { obj: Object, index: i32 },
-    #[error("index operator not supported between `{obj}` and `{index_type}`")]
-    IndexOperatorNotSupported { obj: Type, index_type: Type },
-    #[error("key (`{key}`) not in map: `{obj}`")]
-    KeyNotFound { obj: Object, key: Object },
+    #[error("index of `{index}` out of range in array `{obj}` on line {line}")]
+    IndexOutOfRange {
+        obj: Object,
+        index: i32,
+        line: usize,
+    },
+    #[error("index operator not supported between `{obj}` and `{index_type}` on line {line}")]
+    IndexOperatorNotSupported {
+        obj: Type,
+        index_type: Type,
+        line: usize,
+    },
+    #[error("key (`{key}`) not in map: `{obj}` on line {line}")]
+    KeyNotFound {
+        obj: Object,
+        key: Object,
+        line: usize,
+    },
     #[error("cannot iterate through object of type `{obj}`")]
     CannotIterate { obj: Type, line: usize },
 }

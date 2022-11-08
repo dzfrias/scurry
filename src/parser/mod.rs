@@ -706,6 +706,7 @@ impl<'a> Parser<'a> {
         Some(IndexExpr {
             left: Box::new(left_exp),
             index: Box::new(index),
+            line: self.line,
         })
     }
 
@@ -1631,6 +1632,7 @@ mod tests {
         let expecteds = [Stmt::Expr(Expr::Index(IndexExpr {
             left: Box::new(Expr::Ident(Ident("x".to_owned()))),
             index: Box::new(Expr::Literal(Literal::Integer(3))),
+            line: 1,
         }))];
 
         test_parse!(inputs, expecteds)

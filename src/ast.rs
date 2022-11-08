@@ -121,6 +121,7 @@ impl fmt::Display for CallExpr {
 pub struct IndexExpr {
     pub left: Box<Expr>,
     pub index: Box<Expr>,
+    pub line: usize,
 }
 
 impl fmt::Display for IndexExpr {

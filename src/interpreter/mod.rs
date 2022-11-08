@@ -88,10 +88,10 @@ impl Interpreter {
                 Ok(Object::Map(Rc::new(RefCell::new(pairs))))
             }
             Expr::Ident(Ident(name)) => self.eval_ident(&name),
-            Expr::Index(IndexExpr { left, index }) => {
+            Expr::Index(IndexExpr { left, index, line }) => {
                 let expr = self.eval_expr(*left)?;
                 let index = self.eval_expr(*index)?;
-                self.eval_index_expr(expr, index)
+                self.eval_index_expr(expr, index, line)
             }
             Expr::Prefix(PrefixExpr { left, op, line }) => {
                 let left = self.eval_expr(*left)?;
@@ -359,15 +359,23 @@ impl Interpreter {
         Ok(Object::Nil)
     }
 
-    fn eval_index_expr(&mut self, obj: Object, index: Object) -> EvalResult {
+    fn eval_index_expr(&mut self, obj: Object, index: Object, line: usize) -> EvalResult {
         match (&obj, &index) {
             (Object::Array(arr), Object::Int(i)) => {
                 if arr.borrow().is_empty() {
-                    return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
+                    return Err(RuntimeError::IndexOutOfRange {
+                        obj,
+                        index: *i,
+                        line,
+                    });
                 }
                 if *i < 0 {
                     if i.unsigned_abs() as usize > arr.borrow().len() {
-                        return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
+                        return Err(RuntimeError::IndexOutOfRange {
+                            obj,
+                            index: *i,
+                            line,
+                        });
                     }
                     return match arr
                         .borrow()
@@ -380,32 +388,53 @@ impl Interpreter {
                         None => Err(RuntimeError::IndexOutOfRange {
                             obj: obj.clone(),
                             index: *i,
+                            line,
                         }),
                     };
                 }
                 let idx = *i as usize;
                 if idx > arr.borrow().len() - 1 {
-                    Err(RuntimeError::IndexOutOfRange { obj, index: *i })
+                    Err(RuntimeError::IndexOutOfRange {
+                        obj,
+                        index: *i,
+                        line,
+                    })
                 } else {
                     Ok(arr.borrow()[idx].clone())
                 }
             }
             (Object::String(s), Object::Int(i)) => {
                 if s.is_empty() {
-                    return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
+                    return Err(RuntimeError::IndexOutOfRange {
+                        obj,
+                        index: *i,
+                        line,
+                    });
                 }
                 if *i < 0 {
                     if i.unsigned_abs() as usize > s.len() {
-                        return Err(RuntimeError::IndexOutOfRange { obj, index: *i });
+                        return Err(RuntimeError::IndexOutOfRange {
+                            obj,
+                            index: *i,
+                            line,
+                        });
                     }
                     return match s.chars().rev().take(i.unsigned_abs() as usize).last() {
                         Some(item) => Ok(Object::String(item.to_string())),
-                        None => Err(RuntimeError::IndexOutOfRange { obj, index: *i }),
+                        None => Err(RuntimeError::IndexOutOfRange {
+                            obj,
+                            index: *i,
+                            line,
+                        }),
                     };
                 }
                 match s.chars().nth(*i as usize) {
                     Some(c) => Ok(Object::String(c.to_string())),
-                    None => Err(RuntimeError::IndexOutOfRange { obj, index: *i }),
+                    None => Err(RuntimeError::IndexOutOfRange {
+                        obj,
+                        index: *i,
+                        line,
+                    }),
                 }
             }
             (Object::Map(map), Object::Int(_) | Object::Bool(_) | Object::String(_)) => {
@@ -414,12 +443,14 @@ impl Interpreter {
                     None => Err(RuntimeError::KeyNotFound {
                         obj: obj.clone(),
                         key: index,
+                        line,
                     }),
                 }
             }
             _ => Err(RuntimeError::IndexOperatorNotSupported {
                 obj: obj.scurry_type(),
                 index_type: index.scurry_type(),
+                line,
             }),
         }
     }
@@ -777,14 +808,17 @@ mod tests {
             RuntimeError::IndexOutOfRange {
                 obj: array![Object::Int(1), Object::Int(2), Object::Int(3)],
                 index: 3,
+                line: 1,
             },
             RuntimeError::IndexOutOfRange {
                 obj: Object::Array(Rc::new(RefCell::new(Vec::new()))),
                 index: 0,
+                line: 1,
             },
             RuntimeError::IndexOutOfRange {
                 obj: array![Object::Int(1), Object::Int(2), Object::Int(3)],
                 index: -4,
+                line: 1,
             },
         ];
 
@@ -810,14 +844,17 @@ mod tests {
             RuntimeError::IndexOutOfRange {
                 obj: Object::String("test".to_owned()),
                 index: 10,
+                line: 1,
             },
             RuntimeError::IndexOutOfRange {
                 obj: Object::String("test".to_owned()),
                 index: -10,
+                line: 1,
             },
             RuntimeError::IndexOutOfRange {
                 obj: Object::String("".to_owned()),
                 index: 0,
+                line: 1,
             },
         ];
 
@@ -866,10 +903,12 @@ mod tests {
             RuntimeError::KeyNotFound {
                 obj: Object::Map(Rc::new(RefCell::new(HashMap::new()))),
                 key: Object::Int(44),
+                line: 1,
             },
             RuntimeError::KeyNotFound {
                 obj: Object::Map(Rc::new(RefCell::new(map))),
                 key: Object::Int(33),
+                line: 1,
             },
         ];
 
