@@ -1,3 +1,4 @@
+use super::env::Env;
 use crate::ast::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -27,6 +28,11 @@ pub enum Object {
     String(String),
     Array(Rc<RefCell<Vec<Object>>>),
     Map(Rc<RefCell<HashMap<Object, Object>>>),
+    Function {
+        params: Vec<Ident>,
+        body: Block,
+        env: Rc<RefCell<Env>>,
+    },
     Nil,
 }
 
@@ -37,6 +43,11 @@ impl Clone for Object {
             Self::Float(f) => Object::Float(*f),
             Self::Bool(b) => Object::Bool(*b),
             Self::String(s) => Object::String(s.clone()),
+            Self::Function { params, body, env } => Object::Function {
+                params: params.clone(),
+                body: body.clone(),
+                env: Rc::clone(env),
+            },
             Self::Nil => Object::Nil,
 
             Self::Map(map) => Object::Map(Rc::clone(map)),
@@ -65,6 +76,7 @@ impl Object {
     pub fn scurry_type(&self) -> Type {
         match self {
             Self::Int(_) => Type::Int,
+            Self::Function { .. } => Type::Function,
             Self::Float(_) => Type::Float,
             Self::Bool(_) => Type::Bool,
             Self::String(_) => Type::String,
@@ -80,6 +92,7 @@ impl Object {
             Self::Float(f) => *f != 0.0,
             Self::Bool(b) => *b,
             Self::String(s) => !s.is_empty(),
+            Self::Function { .. } => false,
             Self::Array(arr) => !arr.borrow().is_empty(),
             Self::Map(map) => !map.borrow().is_empty(),
             Self::Nil => false,
@@ -116,6 +129,17 @@ impl fmt::Display for Object {
                     .collect::<String>();
                 write!(f, "{{{}}}", pairs.strip_suffix(", ").unwrap_or_default())
             }
+            Self::Function { params, body, .. } => {
+                let params = params
+                    .iter()
+                    .map(|ident| ident.to_string() + ", ")
+                    .collect::<String>();
+                write!(
+                    f,
+                    "fn({}) {body}",
+                    params.strip_suffix(", ").unwrap_or_default()
+                )
+            }
             Self::Nil => write!(f, "nil"),
         }
     }
@@ -130,6 +154,7 @@ pub enum Type {
     Nil,
     Array,
     Map,
+    Function,
 }
 
 impl fmt::Display for Type {
@@ -142,6 +167,7 @@ impl fmt::Display for Type {
             Self::Array => write!(f, "Array"),
             Self::Nil => write!(f, "Nil"),
             Self::Map => write!(f, "Map"),
+            Self::Function => write!(f, "Function"),
         }
     }
 }

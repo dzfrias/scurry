@@ -50,6 +50,19 @@ impl Interpreter {
                 Ok(Object::Nil)
             }
             Stmt::While(WhileStmt { condition, block }) => self.eval_while_stmt(condition, block),
+            Stmt::Function(FunctionStmt {
+                name,
+                params,
+                block,
+            }) => {
+                let func = Object::Function {
+                    params,
+                    body: block,
+                    env: Rc::clone(&self.env),
+                };
+                self.env.borrow_mut().set(name.0, func);
+                Ok(Object::Nil)
+            }
             Stmt::For(ForStmt {
                 iter_ident,
                 expr,
@@ -93,6 +106,11 @@ impl Interpreter {
                 let index = self.eval_expr(*index)?;
                 self.eval_index_expr(expr, index, line)
             }
+            Expr::Function(FunctionExpr { params, block }) => Ok(Object::Function {
+                params,
+                body: block,
+                env: Rc::clone(&self.env),
+            }),
             Expr::Prefix(PrefixExpr { left, op, line }) => {
                 let left = self.eval_expr(*left)?;
                 self.eval_prefix_expr(op, left, line)
