@@ -33,6 +33,7 @@ pub enum Object {
         body: Block,
         env: Rc<RefCell<Env>>,
     },
+    ReturnVal(Box<Object>),
     Nil,
 }
 
@@ -49,6 +50,7 @@ impl Clone for Object {
                 env: Rc::clone(env),
             },
             Self::Nil => Object::Nil,
+            Self::ReturnVal(obj) => Object::ReturnVal(obj.clone()),
 
             Self::Map(map) => Object::Map(Rc::clone(map)),
             Self::Array(arr) => Object::Array(Rc::clone(arr)),
@@ -83,6 +85,7 @@ impl Object {
             Self::Array(_) => Type::Array,
             Self::Map(_) => Type::Map,
             Self::Nil => Type::Nil,
+            Self::ReturnVal(_) => Type::Nil,
         }
     }
 
@@ -95,6 +98,7 @@ impl Object {
             Self::Function { .. } => false,
             Self::Array(arr) => !arr.borrow().is_empty(),
             Self::Map(map) => !map.borrow().is_empty(),
+            Self::ReturnVal(_) => false,
             Self::Nil => false,
         }
     }
@@ -129,6 +133,7 @@ impl fmt::Display for Object {
                     .collect::<String>();
                 write!(f, "{{{}}}", pairs.strip_suffix(", ").unwrap_or_default())
             }
+            Self::ReturnVal(obj) => write!(f, "{}", *obj),
             Self::Function { params, body, .. } => {
                 let params = params
                     .iter()
@@ -140,7 +145,7 @@ impl fmt::Display for Object {
                     params.strip_suffix(", ").unwrap_or_default()
                 )
             }
-            Self::Nil => write!(f, "nil"),
+            Self::Nil => write!(f, "Nil"),
         }
     }
 }
@@ -238,6 +243,14 @@ pub enum RuntimeError {
     },
     #[error("cannot iterate through object of type `{obj}`")]
     CannotIterate { obj: Type, line: usize },
+    #[error("not enough function arguments, got {got}, want {want}")]
+    NotEnoughArgs {
+        got: usize,
+        want: usize,
+        line: usize,
+    },
+    #[error("type `{obj}` is not callable")]
+    NotCallable { obj: Type, line: usize },
 }
 
 pub type EvalResult = Result<Object, RuntimeError>;

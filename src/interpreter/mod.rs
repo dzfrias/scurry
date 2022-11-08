@@ -35,11 +35,14 @@ impl Interpreter {
         Ok(result)
     }
 
-    fn eval_block(&mut self, block: Block) -> Result<(), RuntimeError> {
+    fn eval_block(&mut self, block: Block) -> EvalResult {
         for stmt in block.0 {
-            self.eval_stmt(stmt)?;
+            let result = self.eval_stmt(stmt)?;
+            if matches!(result, Object::ReturnVal(_)) {
+                return Ok(result);
+            }
         }
-        Ok(())
+        Ok(Object::Nil)
     }
 
     fn eval_stmt(&mut self, stmt: Stmt) -> EvalResult {
@@ -50,6 +53,9 @@ impl Interpreter {
                 Ok(Object::Nil)
             }
             Stmt::While(WhileStmt { condition, block }) => self.eval_while_stmt(condition, block),
+            Stmt::Return(ReturnStmt { value }) => {
+                Ok(Object::ReturnVal(Box::new(self.eval_expr(value)?)))
+            }
             Stmt::Function(FunctionStmt {
                 name,
                 params,
@@ -111,6 +117,17 @@ impl Interpreter {
                 body: block,
                 env: Rc::clone(&self.env),
             }),
+            Expr::Call(CallExpr { func, args }) => {
+                let func = self.eval_expr(*func)?;
+                let args = {
+                    let mut result = Vec::new();
+                    for arg in args {
+                        result.push(self.eval_expr(arg)?);
+                    }
+                    result
+                };
+                self.eval_call_expr(func, args)
+            }
             Expr::Prefix(PrefixExpr { left, op, line }) => {
                 let left = self.eval_expr(*left)?;
                 self.eval_prefix_expr(op, left, line)
@@ -475,7 +492,7 @@ impl Interpreter {
 
     fn eval_while_stmt(&mut self, condition: Expr, block: Block) -> EvalResult {
         while self.eval_expr(condition.clone())?.is_truthy() {
-            self.eval_block(block.clone())?
+            self.eval_block(block.clone())?;
         }
         Ok(Object::Nil)
     }
@@ -486,14 +503,14 @@ impl Interpreter {
             Object::Array(arr) => {
                 for obj in arr.borrow().iter() {
                     self.env.borrow_mut().set(iter_ident.0.clone(), obj.clone());
-                    self.eval_block(block.clone())?
+                    self.eval_block(block.clone())?;
                 }
                 Ok(Object::Nil)
             }
             Object::Map(map) => {
                 for (key, _) in map.borrow().iter() {
                     self.env.borrow_mut().set(iter_ident.0.clone(), key.clone());
-                    self.eval_block(block.clone())?
+                    self.eval_block(block.clone())?;
                 }
                 Ok(Object::Nil)
             }
@@ -502,13 +519,46 @@ impl Interpreter {
                     self.env
                         .borrow_mut()
                         .set(iter_ident.0.clone(), Object::String(char.to_string()));
-                    self.eval_block(block.clone())?
+                    self.eval_block(block.clone())?;
                 }
                 Ok(Object::Nil)
             }
             _ => Err(RuntimeError::CannotIterate {
                 obj: obj.scurry_type(),
                 // TODO: Line numbers
+                line: 1,
+            }),
+        }
+    }
+
+    fn eval_call_expr(&mut self, func: Object, args: Vec<Object>) -> EvalResult {
+        match func {
+            Object::Function { params, body, env } => {
+                if params.len() != args.len() {
+                    // TODO: Line numbers in call exprs
+                    return Err(RuntimeError::NotEnoughArgs {
+                        got: args.len(),
+                        want: params.len(),
+                        line: 1,
+                    });
+                }
+                let outer = Rc::clone(&self.env);
+                let func_env = {
+                    let mut scope = Env::new_enclosed(Rc::clone(&env));
+                    for (arg, param) in args.iter().zip(params) {
+                        scope.set(param.0, arg.clone());
+                    }
+                    scope
+                };
+                self.env = Rc::new(RefCell::new(func_env));
+                let result = self.eval_block(body)?;
+                self.env = outer;
+                Ok(result)
+            }
+            // Not a function
+            // TODO: Line numbers in call exprs
+            _ => Err(RuntimeError::NotCallable {
+                obj: func.scurry_type(),
                 line: 1,
             }),
         }
@@ -979,5 +1029,24 @@ mod tests {
         ];
 
         runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn eval_function_expr() {
+        let inputs = ["fn(x, y) {}", "fn() {}"];
+        let expecteds = [
+            Object::Function {
+                params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                body: Block(Vec::new()),
+                env: Rc::new(RefCell::new(Env::new())),
+            },
+            Object::Function {
+                params: Vec::new(),
+                body: Block(Vec::new()),
+                env: Rc::new(RefCell::new(Env::new())),
+            },
+        ];
+
+        test_eval!(inputs, expecteds)
     }
 }
