@@ -1049,4 +1049,15 @@ mod tests {
 
         test_eval!(inputs, expecteds)
     }
+
+    #[test]
+    fn err_on_uncallable_object() {
+        let inputs = ["1();"];
+        let errs = [RuntimeError::NotCallable {
+            obj: Type::Int,
+            line: 1,
+        }];
+
+        runtime_error_eval!(inputs, errs)
+    }
 }
