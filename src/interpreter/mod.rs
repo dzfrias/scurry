@@ -65,8 +65,39 @@ impl Interpreter {
                     params,
                     body: block,
                     env: Rc::clone(&self.env),
+                    bound: None,
                 };
                 self.env.borrow_mut().set(name.0, func);
+                Ok(Object::Nil)
+            }
+            Stmt::Declaration(DeclarationStmt {
+                name,
+                methods,
+                fields,
+                // TODO: Embeds
+                embeds,
+            }) => {
+                self.env.borrow_mut().set(
+                    name.0.clone(),
+                    Object::Component(Component {
+                        name,
+                        fields,
+                        methods: methods
+                            .into_iter()
+                            .map(|func| {
+                                (
+                                    func.name.0,
+                                    Object::Function {
+                                        params: func.params,
+                                        body: func.block,
+                                        env: Rc::clone(&self.env),
+                                        bound: None,
+                                    },
+                                )
+                            })
+                            .collect(),
+                    }),
+                );
                 Ok(Object::Nil)
             }
             Stmt::For(ForStmt {
@@ -116,7 +147,12 @@ impl Interpreter {
                 params,
                 body: block,
                 env: Rc::clone(&self.env),
+                bound: None,
             }),
+            Expr::Dot(DotExpr { left, field, line }) => {
+                let expr = self.eval_expr(*left)?;
+                self.eval_dot_expr(expr, field.0, line)
+            }
             Expr::Call(CallExpr { func, args }) => {
                 let func = self.eval_expr(*func)?;
                 let args = {
@@ -142,7 +178,6 @@ impl Interpreter {
                 let right = self.eval_expr(*right)?;
                 self.eval_infix_expr(op, left, right, line)
             }
-            _ => todo!(),
         }
     }
 
@@ -531,9 +566,17 @@ impl Interpreter {
         }
     }
 
-    fn eval_call_expr(&mut self, func: Object, args: Vec<Object>) -> EvalResult {
+    fn eval_call_expr(&mut self, func: Object, mut args: Vec<Object>) -> EvalResult {
         match func {
-            Object::Function { params, body, env } => {
+            Object::Function {
+                params,
+                body,
+                env,
+                bound,
+            } => {
+                if let Some(obj) = bound {
+                    args.insert(0, (*obj).clone());
+                }
                 if params.len() != args.len() {
                     // TODO: Line numbers in call exprs
                     return Err(RuntimeError::NotEnoughArgs {
@@ -555,11 +598,67 @@ impl Interpreter {
                 self.env = outer;
                 Ok(result)
             }
+            Object::Component(component) => {
+                let rc_component = Rc::new(component);
+                let instance = Object::Instance {
+                    component: Rc::clone(&rc_component),
+                    field_values: Rc::new(RefCell::new(HashMap::new())),
+                };
+                if let Some(func) = Rc::clone(&rc_component).methods.get("__new") {
+                    let mut new_args = args.clone();
+                    new_args.insert(0, instance.clone());
+                    self.eval_call_expr(func.clone(), new_args)?;
+                }
+                Ok(instance)
+            }
             // Not a function
             // TODO: Line numbers in call exprs
             _ => Err(RuntimeError::NotCallable {
                 obj: func.scurry_type(),
                 line: 1,
+            }),
+        }
+    }
+
+    fn eval_dot_expr(&self, left: Object, field: String, line: usize) -> EvalResult {
+        match left {
+            Object::Instance {
+                ref component,
+                ref field_values,
+            } => match field_values.borrow().get(&field) {
+                Some(value) => Ok(value.clone()),
+                None => match component.methods.get(&field) {
+                    Some(method) => {
+                        if let Object::Function {
+                            params, body, env, ..
+                        } = method
+                        {
+                            Ok(Object::Function {
+                                params: params.clone(),
+                                body: body.clone(),
+                                env: env.clone(),
+                                bound: Some(Rc::new(left.clone())),
+                            })
+                        } else {
+                            unreachable!()
+                        }
+                    }
+                    None => {
+                        if component.fields.contains(&Ident(field.clone())) {
+                            Ok(Object::Nil)
+                        } else {
+                            Err(RuntimeError::UnrecognizedField {
+                                field,
+                                obj: left.scurry_type(),
+                                line,
+                            })
+                        }
+                    }
+                },
+            },
+            _ => Err(RuntimeError::DotOperatorNotSupported {
+                obj: left.scurry_type(),
+                line,
             }),
         }
     }
@@ -1039,11 +1138,13 @@ mod tests {
                 params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
                 body: Block(Vec::new()),
                 env: Rc::new(RefCell::new(Env::new())),
+                bound: None,
             },
             Object::Function {
                 params: Vec::new(),
                 body: Block(Vec::new()),
                 env: Rc::new(RefCell::new(Env::new())),
+                bound: None,
             },
         ];
 

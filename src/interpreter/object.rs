@@ -32,6 +32,12 @@ pub enum Object {
         params: Vec<Ident>,
         body: Block,
         env: Rc<RefCell<Env>>,
+        bound: Option<Rc<Object>>,
+    },
+    Component(Component),
+    Instance {
+        component: Rc<Component>,
+        field_values: Rc<RefCell<HashMap<String, Object>>>,
     },
     ReturnVal(Box<Object>),
     Nil,
@@ -44,14 +50,27 @@ impl Clone for Object {
             Self::Float(f) => Object::Float(*f),
             Self::Bool(b) => Object::Bool(*b),
             Self::String(s) => Object::String(s.clone()),
-            Self::Function { params, body, env } => Object::Function {
+            Self::Function {
+                params,
+                body,
+                env,
+                bound,
+            } => Object::Function {
                 params: params.clone(),
                 body: body.clone(),
                 env: Rc::clone(env),
+                bound: bound.clone(),
             },
             Self::Nil => Object::Nil,
             Self::ReturnVal(obj) => Object::ReturnVal(obj.clone()),
-
+            Self::Instance {
+                component,
+                field_values,
+            } => Object::Instance {
+                component: Rc::clone(component),
+                field_values: Rc::clone(field_values),
+            },
+            Self::Component(component) => Object::Component(component.clone()),
             Self::Map(map) => Object::Map(Rc::clone(map)),
             Self::Array(arr) => Object::Array(Rc::clone(arr)),
         }
@@ -84,6 +103,8 @@ impl Object {
             Self::String(_) => Type::String,
             Self::Array(_) => Type::Array,
             Self::Map(_) => Type::Map,
+            Self::Instance { component, .. } => Type::Instance(component.name.0.clone()),
+            Self::Component { .. } => Type::Component,
             Self::Nil => Type::Nil,
             Self::ReturnVal(_) => Type::Nil,
         }
@@ -99,6 +120,8 @@ impl Object {
             Self::Array(arr) => !arr.borrow().is_empty(),
             Self::Map(map) => !map.borrow().is_empty(),
             Self::ReturnVal(_) => false,
+            Self::Instance { .. } => false,
+            Self::Component { .. } => false,
             Self::Nil => false,
         }
     }
@@ -145,6 +168,13 @@ impl fmt::Display for Object {
                     params.strip_suffix(", ").unwrap_or_default()
                 )
             }
+            Self::Instance {
+                component,
+                field_values,
+            } => {
+                todo!()
+            }
+            Self::Component { .. } => todo!(),
             Self::Nil => write!(f, "Nil"),
         }
     }
@@ -160,6 +190,16 @@ pub enum Type {
     Array,
     Map,
     Function,
+    Instance(String),
+    Component,
+    Method,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Component {
+    pub name: Ident,
+    pub fields: Vec<Ident>,
+    pub methods: HashMap<String, Object>,
 }
 
 impl fmt::Display for Type {
@@ -173,6 +213,9 @@ impl fmt::Display for Type {
             Self::Nil => write!(f, "Nil"),
             Self::Map => write!(f, "Map"),
             Self::Function => write!(f, "Function"),
+            Self::Component => write!(f, "Component"),
+            Self::Method => write!(f, "Method"),
+            Self::Instance(inst_type) => write!(f, "{}", inst_type),
         }
     }
 }
@@ -251,6 +294,14 @@ pub enum RuntimeError {
     },
     #[error("type `{obj}` is not callable")]
     NotCallable { obj: Type, line: usize },
+    #[error("cannot use dot operator on type `{obj}` on line {line}")]
+    DotOperatorNotSupported { obj: Type, line: usize },
+    #[error("unrecognized field `{field}` on object of type `{obj}` on line {line}")]
+    UnrecognizedField {
+        field: String,
+        obj: Type,
+        line: usize,
+    },
 }
 
 pub type EvalResult = Result<Object, RuntimeError>;

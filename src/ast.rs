@@ -263,7 +263,7 @@ impl fmt::Display for PrefixOp {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct Ident(pub String);
 
 impl fmt::Display for Ident {
