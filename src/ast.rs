@@ -301,7 +301,7 @@ impl fmt::Display for Stmt {
             Self::While(stmt) => write!(f, "{stmt}"),
             Self::Function(stmt) => write!(f, "{stmt}"),
             Self::Switch(stmt) => write!(f, "{stmt}"),
-            Self::Declaration(_) => todo!(),
+            Self::Declaration(stmt) => write!(f, "{stmt}"),
             Self::Break => write!(f, "break;"),
             Self::Continue => write!(f, "continue;"),
             Self::Expr(expr) => write!(f, "{expr}"),
