@@ -31,6 +31,10 @@ impl Interpreter {
         let mut result = Object::Nil;
         for stmt in program.0 {
             result = self.eval_stmt(stmt)?;
+            // Get rid of return val wrappers, no longer needed
+            if let Object::ReturnVal(val) = result {
+                result = *val
+            }
         }
         Ok(result)
     }
@@ -74,9 +78,25 @@ impl Interpreter {
                 name,
                 methods,
                 fields,
-                // TODO: Embeds
                 embeds,
             }) => {
+                let embedded = {
+                    let mut embedded = Vec::new();
+                    for embed in embeds {
+                        let embed_component = match self.env.borrow().get(&embed.name.0) {
+                            Some(Object::Component(component)) => component,
+                            _ => {
+                                return Err(RuntimeError::InvalidEmbed {
+                                    name: embed.name.0,
+                                    // TODO: Line numbers in declarations
+                                    line: 1,
+                                });
+                            }
+                        };
+                        embedded.push((embed_component, embed.assigned));
+                    }
+                    embedded
+                };
                 self.env.borrow_mut().set(
                     name.0.clone(),
                     Object::Component(Component {
@@ -96,6 +116,7 @@ impl Interpreter {
                                 )
                             })
                             .collect(),
+                        embeds: embedded,
                     }),
                 );
                 Ok(Object::Nil)
@@ -575,7 +596,7 @@ impl Interpreter {
                 bound,
             } => {
                 if let Some(obj) = bound {
-                    args.insert(0, (*obj).clone());
+                    args.insert(0, Object::Instance((*obj).clone()));
                 }
                 if params.len() != args.len() {
                     // TODO: Line numbers in call exprs
@@ -600,16 +621,47 @@ impl Interpreter {
             }
             Object::Component(component) => {
                 let rc_component = Rc::new(component);
-                let instance = Object::Instance {
+                let mut instance = Instance {
                     component: Rc::clone(&rc_component),
-                    field_values: Rc::new(RefCell::new(HashMap::new())),
+                    field_values: Rc::new(RefCell::new(
+                        Rc::clone(&rc_component)
+                            .fields
+                            .iter()
+                            .map(|name| (name.0.to_owned(), Object::Nil))
+                            .collect(),
+                    )),
+                    embeds: Vec::new(),
                 };
                 if let Some(func) = Rc::clone(&rc_component).methods.get("__new") {
                     let mut new_args = args.clone();
-                    new_args.insert(0, instance.clone());
+                    new_args.insert(0, Object::Instance(instance.clone()));
                     self.eval_call_expr(func.clone(), new_args)?;
                 }
-                Ok(instance)
+                for (embed, assigned) in &Rc::clone(&rc_component).embeds {
+                    let mut args = Vec::new();
+                    for field in assigned {
+                        args.push(
+                            instance
+                                .field_values
+                                .borrow()
+                                .get(&field.0)
+                                .ok_or(RuntimeError::InvalidAssignedField {
+                                    field: field.0.clone(),
+                                    // TODO: Line numbers in fields
+                                    line: 1,
+                                })?
+                                .clone(),
+                        )
+                    }
+                    let embed_instance =
+                        self.eval_call_expr(Object::Component(embed.clone()), args)?;
+                    if let Object::Instance(inst) = embed_instance {
+                        instance.embeds.push(inst);
+                    } else {
+                        unreachable!()
+                    }
+                }
+                Ok(Object::Instance(instance))
             }
             // Not a function
             // TODO: Line numbers in call exprs
@@ -622,10 +674,11 @@ impl Interpreter {
 
     fn eval_dot_expr(&self, left: Object, field: String, line: usize) -> EvalResult {
         match left {
-            Object::Instance {
+            Object::Instance(Instance {
                 ref component,
                 ref field_values,
-            } => match field_values.borrow().get(&field) {
+                ref embeds,
+            }) => match field_values.borrow().get(&field) {
                 Some(value) => Ok(value.clone()),
                 None => match component.methods.get(&field) {
                     Some(method) => {
@@ -637,22 +690,37 @@ impl Interpreter {
                                 params: params.clone(),
                                 body: body.clone(),
                                 env: env.clone(),
-                                bound: Some(Rc::new(left.clone())),
+                                bound: Some(Rc::new(Instance {
+                                    component: component.clone(),
+                                    field_values: field_values.clone(),
+                                    embeds: embeds.clone(),
+                                })),
                             })
                         } else {
                             unreachable!()
                         }
                     }
                     None => {
-                        if component.fields.contains(&Ident(field.clone())) {
-                            Ok(Object::Nil)
-                        } else {
-                            Err(RuntimeError::UnrecognizedField {
-                                field,
-                                obj: left.scurry_type(),
-                                line,
-                            })
+                        for embed in embeds {
+                            match embed.component.methods.get(&field) {
+                                Some(Object::Function {
+                                    params, body, env, ..
+                                }) => {
+                                    return Ok(Object::Function {
+                                        params: params.clone(),
+                                        body: body.clone(),
+                                        env: env.clone(),
+                                        bound: Some(Rc::new(embed.clone())),
+                                    })
+                                }
+                                _ => unreachable!(),
+                            }
                         }
+                        Err(RuntimeError::UnrecognizedField {
+                            field,
+                            obj: left.scurry_type(),
+                            line,
+                        })
                     }
                 },
             },
@@ -1152,10 +1220,250 @@ mod tests {
     }
 
     #[test]
+    fn eval_function_calls() {
+        let inputs = ["fn(x, y) { return x + y; }(1, 2);"];
+        let expecteds = [Object::Int(3)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_function_calls_with_outer_env() {
+        let inputs = ["x = 3; fn(y) { return x - y; }(2);"];
+        let expecteds = [Object::Int(1)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
     fn err_on_uncallable_object() {
         let inputs = ["1();"];
         let errs = [RuntimeError::NotCallable {
             obj: Type::Int,
+            line: 1,
+        }];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn eval_basic_decl_statement() {
+        let inputs = [
+            "decl Test { field }; Test;",
+            "decl Test { fn x(self, x) {} }; Test;",
+        ];
+        let expecteds = [
+            Object::Component(Component {
+                name: Ident("Test".to_owned()),
+                fields: vec![Ident("field".to_owned())],
+                methods: HashMap::new(),
+                embeds: Vec::new(),
+            }),
+            Object::Component(Component {
+                name: Ident("Test".to_owned()),
+                fields: Vec::new(),
+                methods: {
+                    let mut map = HashMap::new();
+                    map.insert(
+                        "x".to_owned(),
+                        Object::Function {
+                            params: vec![Ident("self".to_owned()), Ident("x".to_owned())],
+                            body: Block(Vec::new()),
+                            env: Rc::new(RefCell::new(Env::new())),
+                            bound: None,
+                        },
+                    );
+                    map
+                },
+                embeds: Vec::new(),
+            }),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_embed_in_decl_statement() {
+        let inputs = [
+            "decl Test { fn x(self, y) {} }; decl Test2 { [Test] {} }; Test2;",
+            "decl Test { fn __new(self, param) {} }; decl Test2 { field [Test] { field } }; Test2;",
+        ];
+        let expecteds = [
+            Object::Component(Component {
+                name: Ident("Test2".to_owned()),
+                fields: Vec::new(),
+                methods: HashMap::new(),
+                embeds: vec![(
+                    Component {
+                        name: Ident("Test".to_owned()),
+                        fields: Vec::new(),
+                        methods: {
+                            let mut map = HashMap::new();
+                            map.insert(
+                                "x".to_owned(),
+                                Object::Function {
+                                    params: vec![Ident("self".to_owned()), Ident("y".to_owned())],
+                                    body: Block(Vec::new()),
+                                    env: Rc::new(RefCell::new(Env::new())),
+                                    bound: None,
+                                },
+                            );
+                            map
+                        },
+                        embeds: Vec::new(),
+                    },
+                    Vec::new(),
+                )],
+            }),
+            Object::Component(Component {
+                name: Ident("Test2".to_owned()),
+                fields: vec![Ident("field".to_owned())],
+                methods: HashMap::new(),
+                embeds: vec![(
+                    Component {
+                        name: Ident("Test".to_owned()),
+                        fields: Vec::new(),
+                        methods: {
+                            let mut map = HashMap::new();
+                            map.insert(
+                                "__new".to_owned(),
+                                Object::Function {
+                                    params: vec![
+                                        Ident("self".to_owned()),
+                                        Ident("param".to_owned()),
+                                    ],
+                                    body: Block(Vec::new()),
+                                    env: Rc::new(RefCell::new(Env::new())),
+                                    bound: None,
+                                },
+                            );
+                            map
+                        },
+                        embeds: Vec::new(),
+                    },
+                    vec![Ident("field".to_owned())],
+                )],
+            }),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_object_instance() {
+        let inputs = [
+            "decl Test { field }; Test();",
+            "decl Test { fn __new(self, x) {} }; Test(3);",
+        ];
+        let expecteds = [
+            Object::Instance(Instance {
+                component: Rc::new(Component {
+                    name: Ident("Test".to_owned()),
+                    fields: vec![Ident("field".to_owned())],
+                    methods: HashMap::new(),
+                    embeds: Vec::new(),
+                }),
+                field_values: Rc::new(RefCell::new({
+                    let mut map = HashMap::new();
+                    map.insert("field".to_owned(), Object::Nil);
+                    map
+                })),
+                embeds: Vec::new(),
+            }),
+            Object::Instance(Instance {
+                component: Rc::new(Component {
+                    name: Ident("Test".to_owned()),
+                    fields: Vec::new(),
+                    methods: {
+                        let mut map = HashMap::new();
+                        map.insert(
+                            "__new".to_owned(),
+                            Object::Function {
+                                params: vec![Ident("self".to_owned()), Ident("x".to_owned())],
+                                body: Block(Vec::new()),
+                                env: Rc::new(RefCell::new(Env::new())),
+                                bound: None,
+                            },
+                        );
+                        map
+                    },
+                    embeds: Vec::new(),
+                }),
+                field_values: Rc::new(RefCell::new(HashMap::new())),
+                embeds: Vec::new(),
+            }),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_methods_and_dot_expr() {
+        let inputs = [
+            "decl Test { fn x(self, y) { return y; } }; Test().x(3);",
+            "decl Test { fn x(self) { return 3; } }; Test().x();",
+            "decl Test { field fn x(self) { return self.field; } }; Test().x();",
+        ];
+        let expecteds = [Object::Int(3), Object::Int(3), Object::Nil];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_embedded_methods_in_component_instances() {
+        let inputs =
+            ["decl Test { fn x(self) { return 3; } }; decl Test2 { [Test] {} }; Test2().x();"];
+        let expecteds = [Object::Int(3)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn invalid_use_of_dot_operator() {
+        let inputs = ["\"hello\".world;", "3.3.test;"];
+        let errs = [
+            RuntimeError::DotOperatorNotSupported {
+                obj: Type::String,
+                line: 1,
+            },
+            RuntimeError::DotOperatorNotSupported {
+                obj: Type::Float,
+                line: 1,
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn unrecognized_field_in_component_instance() {
+        let inputs = ["decl Test { field }; Test().invalid;"];
+        let errs = [RuntimeError::UnrecognizedField {
+            field: "invalid".to_owned(),
+            obj: Type::Instance("Test".to_owned()),
+            line: 1,
+        }];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn invalid_embed() {
+        let inputs = ["decl Test { [DoesNotExist] {} }; Test();"];
+        let errs = [RuntimeError::InvalidEmbed {
+            name: "DoesNotExist".to_owned(),
+            line: 1,
+        }];
+
+        runtime_error_eval!(inputs, errs);
+    }
+
+    #[test]
+    fn invalid_assigned_field() {
+        let inputs =
+            ["decl Test { fn __new(self, x) {} }; decl Test2 { [Test] { field } }; Test2();"];
+        let errs = [RuntimeError::InvalidAssignedField {
+            field: "field".to_owned(),
             line: 1,
         }];
 

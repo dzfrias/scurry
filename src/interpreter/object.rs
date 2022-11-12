@@ -32,13 +32,10 @@ pub enum Object {
         params: Vec<Ident>,
         body: Block,
         env: Rc<RefCell<Env>>,
-        bound: Option<Rc<Object>>,
+        bound: Option<Rc<Instance>>,
     },
     Component(Component),
-    Instance {
-        component: Rc<Component>,
-        field_values: Rc<RefCell<HashMap<String, Object>>>,
-    },
+    Instance(Instance),
     ReturnVal(Box<Object>),
     Nil,
 }
@@ -63,13 +60,7 @@ impl Clone for Object {
             },
             Self::Nil => Object::Nil,
             Self::ReturnVal(obj) => Object::ReturnVal(obj.clone()),
-            Self::Instance {
-                component,
-                field_values,
-            } => Object::Instance {
-                component: Rc::clone(component),
-                field_values: Rc::clone(field_values),
-            },
+            Self::Instance(instance) => Object::Instance(instance.clone()),
             Self::Component(component) => Object::Component(component.clone()),
             Self::Map(map) => Object::Map(Rc::clone(map)),
             Self::Array(arr) => Object::Array(Rc::clone(arr)),
@@ -103,7 +94,7 @@ impl Object {
             Self::String(_) => Type::String,
             Self::Array(_) => Type::Array,
             Self::Map(_) => Type::Map,
-            Self::Instance { component, .. } => Type::Instance(component.name.0.clone()),
+            Self::Instance(Instance { component, .. }) => Type::Instance(component.name.0.clone()),
             Self::Component { .. } => Type::Component,
             Self::Nil => Type::Nil,
             Self::ReturnVal(_) => Type::Nil,
@@ -168,10 +159,11 @@ impl fmt::Display for Object {
                     params.strip_suffix(", ").unwrap_or_default()
                 )
             }
-            Self::Instance {
+            Self::Instance(Instance {
                 component,
                 field_values,
-            } => {
+                embeds,
+            }) => {
                 todo!()
             }
             Self::Component { .. } => todo!(),
@@ -195,13 +187,6 @@ pub enum Type {
     Method,
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Component {
-    pub name: Ident,
-    pub fields: Vec<Ident>,
-    pub methods: HashMap<String, Object>,
-}
-
 impl fmt::Display for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -216,6 +201,31 @@ impl fmt::Display for Type {
             Self::Component => write!(f, "Component"),
             Self::Method => write!(f, "Method"),
             Self::Instance(inst_type) => write!(f, "{}", inst_type),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Component {
+    pub name: Ident,
+    pub fields: Vec<Ident>,
+    pub methods: HashMap<String, Object>,
+    pub embeds: Vec<(Component, Vec<Ident>)>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Instance {
+    pub component: Rc<Component>,
+    pub field_values: Rc<RefCell<HashMap<String, Object>>>,
+    pub embeds: Vec<Instance>,
+}
+
+impl Clone for Instance {
+    fn clone(&self) -> Self {
+        Self {
+            component: Rc::clone(&self.component),
+            field_values: Rc::clone(&self.field_values),
+            embeds: self.embeds.clone(),
         }
     }
 }
@@ -302,6 +312,10 @@ pub enum RuntimeError {
         obj: Type,
         line: usize,
     },
+    #[error("invalid embed `{name}`, must refer to a component")]
+    InvalidEmbed { name: String, line: usize },
+    #[error("invalid assigned field `{field}`")]
+    InvalidAssignedField { field: String, line: usize },
 }
 
 pub type EvalResult = Result<Object, RuntimeError>;
