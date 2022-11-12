@@ -51,9 +51,78 @@ impl Interpreter {
 
     fn eval_stmt(&mut self, stmt: Stmt) -> EvalResult {
         match stmt {
-            Stmt::Assign(AssignStmt { name, value }) => {
+            Stmt::Assign(AssignStmt {
+                name,
+                value,
+                index,
+                field,
+            }) => {
                 let val = self.eval_expr(value)?;
-                self.env.borrow_mut().set(name.0, val);
+                if index == None && field == None {
+                    self.env.borrow_mut().set(name.0, val);
+                    return Ok(Object::AbsoluteNil);
+                }
+                let Some(obj) = self.env.borrow().get(&name.0) else {
+                    return Err(RuntimeError::VariableNotFound { name: name.0, line: 1 });
+                };
+                if let Some(field_name) = field {
+                    let Object::Instance(instance) = obj else {
+                        return Err(RuntimeError::DotOperatorNotSupported {
+                            obj: obj.scurry_type(),
+                            line: 1,
+                        });
+                    };
+                    if !instance.field_values.borrow().contains_key(&field_name.0) {
+                        return Err(RuntimeError::InvalidAssignedField {
+                            field: field_name.0,
+                            line: 1,
+                        });
+                    }
+                    instance.field_values.borrow_mut().insert(field_name.0, val);
+                    return Ok(Object::AbsoluteNil);
+                }
+                if let Some(index) = index {
+                    let idx = self.eval_expr(index)?;
+                    return match (&obj, &idx) {
+                        (
+                            Object::Map(map),
+                            Object::Int(_) | Object::String(_) | Object::Bool(_),
+                        ) => {
+                            map.borrow_mut().insert(idx, val);
+                            Ok(Object::AbsoluteNil)
+                        }
+                        (Object::Array(arr), Object::Int(i)) => {
+                            if *i < 0 {
+                                if i.unsigned_abs() as usize > arr.borrow().len() {
+                                    return Err(RuntimeError::IndexOutOfRange {
+                                        obj,
+                                        index: *i,
+                                        line: 1,
+                                    });
+                                }
+                                let rev_idx = arr.borrow().len() - 1;
+                                arr.borrow_mut()[rev_idx] = val;
+                                return Ok(Object::AbsoluteNil);
+                            }
+                            let idx = *i as usize;
+                            if arr.borrow().len() == 0 || idx > arr.borrow().len() - 1 {
+                                Err(RuntimeError::IndexOutOfRange {
+                                    obj,
+                                    index: *i,
+                                    line: 1,
+                                })
+                            } else {
+                                arr.borrow_mut()[idx] = val;
+                                Ok(Object::AbsoluteNil)
+                            }
+                        }
+                        _ => Err(RuntimeError::IndexOperatorNotSupported {
+                            obj: obj.scurry_type(),
+                            index_type: idx.scurry_type(),
+                            line: 1,
+                        }),
+                    };
+                }
                 Ok(Object::AbsoluteNil)
             }
             Stmt::While(WhileStmt { condition, block }) => self.eval_while_stmt(condition, block),
@@ -1469,6 +1538,47 @@ mod tests {
             ["decl Test { fn __new(self, x) {} }; decl Test2 { [Test] { field } }; Test2();"];
         let errs = [RuntimeError::InvalidAssignedField {
             field: "field".to_owned(),
+            line: 1,
+        }];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn field_assignment() {
+        let inputs =
+            ["decl Test { field fn __new(self) { self.field = 5; } }; x = Test(); x.field;"];
+        let expecteds = [Object::Int(5)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn index_assignment_on_maps() {
+        let inputs = ["x = {}; x[\"test\"] = 55; x[\"test\"];"];
+        let expecteds = [Object::Int(55)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn index_assignment_on_arrays() {
+        let inputs = ["x = [1, 2, 3]; x[2] = 8; x[2];"];
+        let expecteds = [Object::Int(8)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn cannot_index_assign_on_out_of_bounds_array() {
+        let inputs = ["x = [1, 2, 3]; x[5] = 3;"];
+        let errs = [RuntimeError::IndexOutOfRange {
+            obj: Object::Array(Rc::new(RefCell::new(vec![
+                Object::Int(1),
+                Object::Int(2),
+                Object::Int(3),
+            ]))),
+            index: 5,
             line: 1,
         }];
 

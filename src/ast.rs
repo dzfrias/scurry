@@ -313,6 +313,8 @@ impl fmt::Display for Stmt {
 pub struct AssignStmt {
     pub name: Ident,
     pub value: Expr,
+    pub field: Option<Ident>,
+    pub index: Option<Expr>,
 }
 
 impl fmt::Display for AssignStmt {
@@ -659,6 +661,8 @@ mod tests {
         let inputs = [AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
+            field: None,
+            index: None,
         }];
 
         let expecteds = ["x = 3;"];

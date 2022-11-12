@@ -255,6 +255,39 @@ impl<'a> Parser<'a> {
                 self.validate_current_scope(ScopeType::Loop)?;
                 Stmt::Continue
             }
+            Token::Ident(ref name) if self.peek_token == Token::Dot => {
+                let cloned_lex = self.lexer.clone();
+                let cloned_name = name.clone();
+                self.next_token();
+                self.next_token();
+                if self.peek_token == Token::Assign {
+                    Stmt::Assign(self.parse_dot_assign_stmt(Ident(cloned_name))?)
+                } else {
+                    // Put the lexer back into its old state
+                    // TODO: Reset position
+                    self.current_token = Token::Ident(cloned_name);
+                    self.peek_token = Token::Dot;
+                    self.lexer = cloned_lex;
+                    Stmt::Expr(self.parse_expr_stmt()?)
+                }
+            }
+            Token::Ident(ref name) if self.peek_token == Token::Lbracket => {
+                let cloned_lex = self.lexer.clone();
+                let cloned_name = name.clone();
+                self.next_token();
+                self.next_token();
+                let index = self.parse_expr(Precedence::Lowest)?;
+                self.expect_peek(Token::Rbracket)?;
+                if self.peek_token == Token::Assign {
+                    Stmt::Assign(self.parse_index_assign_stmt(Ident(cloned_name), index)?)
+                } else {
+                    // Put the lexer back into its old state
+                    self.current_token = Token::Ident(cloned_name);
+                    self.peek_token = Token::Lbracket;
+                    self.lexer = cloned_lex;
+                    Stmt::Expr(self.parse_expr_stmt()?)
+                }
+            }
 
             // Expression on one line
             _ => Stmt::Expr(self.parse_expr_stmt()?),
@@ -468,7 +501,37 @@ impl<'a> Parser<'a> {
         self.expect_peek(Token::Assign)?;
         self.next_token();
         let value = self.parse_expr(Precedence::Lowest)?;
-        Some(AssignStmt { name: ident, value })
+        Some(AssignStmt {
+            name: ident,
+            value,
+            field: None,
+            index: None,
+        })
+    }
+
+    fn parse_dot_assign_stmt(&mut self, ident: Ident) -> Option<AssignStmt> {
+        let field = self.parse_ident()?;
+        self.expect_peek(Token::Assign)?;
+        self.next_token();
+        let value = self.parse_expr(Precedence::Lowest)?;
+        Some(AssignStmt {
+            name: ident,
+            value,
+            field: Some(field),
+            index: None,
+        })
+    }
+
+    fn parse_index_assign_stmt(&mut self, ident: Ident, index: Expr) -> Option<AssignStmt> {
+        self.expect_peek(Token::Assign)?;
+        self.next_token();
+        let value = self.parse_expr(Precedence::Lowest)?;
+        Some(AssignStmt {
+            name: ident,
+            value,
+            field: None,
+            index: Some(index),
+        })
     }
 
     fn parse_if_stmt(&mut self) -> Option<IfStmt> {
@@ -821,6 +884,8 @@ mod tests {
         let expecteds = [Stmt::Assign(AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
+            index: None,
+            field: None,
         })];
 
         test_parse!(inputs, expecteds)
@@ -833,6 +898,8 @@ mod tests {
         let expecteds = [Stmt::Assign(AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
+            index: None,
+            field: None,
         })];
 
         test_parse!(inputs, expecteds)
@@ -846,6 +913,8 @@ mod tests {
         let expecteds = [Stmt::Assign(AssignStmt {
             name: Ident("x".to_owned()),
             value: Expr::Literal(Literal::Integer(3)),
+            field: None,
+            index: None,
         })];
 
         test_parse!(inputs, expecteds)
@@ -1726,6 +1795,32 @@ mod tests {
                 default: None,
             }),
         ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_dot_assignment() {
+        let inputs = ["hello.world = 3;"];
+        let expecteds = [Stmt::Assign(AssignStmt {
+            name: Ident("hello".to_owned()),
+            value: Expr::Literal(Literal::Integer(3)),
+            field: Some(Ident("world".to_owned())),
+            index: None,
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_index_assignment() {
+        let inputs = ["test[1] = 3;"];
+        let expecteds = [Stmt::Assign(AssignStmt {
+            name: Ident("test".to_owned()),
+            value: Expr::Literal(Literal::Integer(3)),
+            field: None,
+            index: Some(Expr::Literal(Literal::Integer(1))),
+        })];
 
         test_parse!(inputs, expecteds)
     }
