@@ -46,7 +46,7 @@ impl Interpreter {
                 return Ok(result);
             }
         }
-        Ok(Object::Nil)
+        Ok(Object::AbsoluteNil)
     }
 
     fn eval_stmt(&mut self, stmt: Stmt) -> EvalResult {
@@ -54,7 +54,7 @@ impl Interpreter {
             Stmt::Assign(AssignStmt { name, value }) => {
                 let val = self.eval_expr(value)?;
                 self.env.borrow_mut().set(name.0, val);
-                Ok(Object::Nil)
+                Ok(Object::AbsoluteNil)
             }
             Stmt::While(WhileStmt { condition, block }) => self.eval_while_stmt(condition, block),
             Stmt::Return(ReturnStmt { value }) => {
@@ -72,7 +72,7 @@ impl Interpreter {
                     bound: None,
                 };
                 self.env.borrow_mut().set(name.0, func);
-                Ok(Object::Nil)
+                Ok(Object::AbsoluteNil)
             }
             Stmt::Declaration(DeclarationStmt {
                 name,
@@ -119,7 +119,7 @@ impl Interpreter {
                         embeds: embedded,
                     }),
                 );
-                Ok(Object::Nil)
+                Ok(Object::AbsoluteNil)
             }
             Stmt::For(ForStmt {
                 iter_ident,
@@ -440,14 +440,14 @@ impl Interpreter {
             for elif in elifs {
                 if self.eval_expr(elif.condition)?.is_truthy() {
                     self.eval_block(elif.block)?;
-                    return Ok(Object::Nil);
+                    return Ok(Object::AbsoluteNil);
                 }
             }
             if let Some(block) = else_block {
                 self.eval_block(block)?;
             }
         }
-        Ok(Object::Nil)
+        Ok(Object::AbsoluteNil)
     }
 
     fn eval_index_expr(&mut self, obj: Object, index: Object, line: usize) -> EvalResult {
@@ -550,7 +550,7 @@ impl Interpreter {
         while self.eval_expr(condition.clone())?.is_truthy() {
             self.eval_block(block.clone())?;
         }
-        Ok(Object::Nil)
+        Ok(Object::AbsoluteNil)
     }
 
     fn eval_for_stmt(&mut self, iter_ident: Ident, expr: Expr, block: Block) -> EvalResult {
@@ -561,14 +561,14 @@ impl Interpreter {
                     self.env.borrow_mut().set(iter_ident.0.clone(), obj.clone());
                     self.eval_block(block.clone())?;
                 }
-                Ok(Object::Nil)
+                Ok(Object::AbsoluteNil)
             }
             Object::Map(map) => {
                 for (key, _) in map.borrow().iter() {
                     self.env.borrow_mut().set(iter_ident.0.clone(), key.clone());
                     self.eval_block(block.clone())?;
                 }
-                Ok(Object::Nil)
+                Ok(Object::AbsoluteNil)
             }
             Object::String(string) => {
                 for char in string.chars() {
@@ -577,7 +577,7 @@ impl Interpreter {
                         .set(iter_ident.0.clone(), Object::String(char.to_string()));
                     self.eval_block(block.clone())?;
                 }
-                Ok(Object::Nil)
+                Ok(Object::AbsoluteNil)
             }
             _ => Err(RuntimeError::CannotIterate {
                 obj: obj.scurry_type(),
@@ -1011,7 +1011,12 @@ mod tests {
             "if False {} elif True { x = 3; } else {}; x;",
             "if False {} elif False {} elif False {} else {}",
         ];
-        let expecteds = [Object::Int(3), Object::Int(3), Object::Int(3), Object::Nil];
+        let expecteds = [
+            Object::Int(3),
+            Object::Int(3),
+            Object::Int(3),
+            Object::AbsoluteNil,
+        ];
 
         test_eval!(inputs, expecteds);
     }

@@ -38,6 +38,8 @@ pub enum Object {
     Instance(Instance),
     ReturnVal(Box<Object>),
     Nil,
+    // Only used for statements, that return absolutely nothing
+    AbsoluteNil,
 }
 
 impl Clone for Object {
@@ -59,6 +61,7 @@ impl Clone for Object {
                 bound: bound.clone(),
             },
             Self::Nil => Object::Nil,
+            Self::AbsoluteNil => Self::AbsoluteNil,
             Self::ReturnVal(obj) => Object::ReturnVal(obj.clone()),
             Self::Instance(instance) => Object::Instance(instance.clone()),
             Self::Component(component) => Object::Component(component.clone()),
@@ -97,6 +100,7 @@ impl Object {
             Self::Instance(Instance { component, .. }) => Type::Instance(component.name.0.clone()),
             Self::Component { .. } => Type::Component,
             Self::Nil => Type::Nil,
+            Self::AbsoluteNil => Type::Nil,
             Self::ReturnVal(_) => Type::Nil,
         }
     }
@@ -114,6 +118,7 @@ impl Object {
             Self::Instance { .. } => false,
             Self::Component { .. } => false,
             Self::Nil => false,
+            Self::AbsoluteNil => false,
         }
     }
 }
@@ -167,6 +172,7 @@ impl fmt::Display for Object {
                 write!(f, "decl {name} {{ ... }}")
             }
             Self::Nil => write!(f, "Nil"),
+            Self::AbsoluteNil => write!(f, ""),
         }
     }
 }
