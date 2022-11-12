@@ -99,6 +99,7 @@ impl fmt::Display for FunctionExpr {
 pub struct CallExpr {
     pub func: Box<Expr>,
     pub args: Vec<Expr>,
+    pub line: usize,
 }
 
 impl fmt::Display for CallExpr {
@@ -315,6 +316,7 @@ pub struct AssignStmt {
     pub value: Expr,
     pub field: Option<Ident>,
     pub index: Option<Expr>,
+    pub line: usize,
 }
 
 impl fmt::Display for AssignStmt {
@@ -372,6 +374,7 @@ pub struct ForStmt {
     pub iter_ident: Ident,
     pub expr: Expr,
     pub block: Block,
+    pub line: usize,
 }
 
 impl fmt::Display for ForStmt {
@@ -501,6 +504,7 @@ impl fmt::Display for DeclarationStmt {
 pub struct Embed {
     pub name: Ident,
     pub assigned: Vec<Ident>,
+    pub line: usize,
 }
 
 impl fmt::Display for Embed {
@@ -663,6 +667,7 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             field: None,
             index: None,
+            line: 1,
         }];
 
         let expecteds = ["x = 3;"];
@@ -736,6 +741,7 @@ mod tests {
             iter_ident: Ident("i".to_owned()),
             expr: Expr::Literal(Literal::Integer(3)),
             block: Block(vec![Stmt::Expr(Expr::Ident(Ident("i".to_owned())))]),
+            line: 1,
         }];
         let expecteds = ["for i in 3 { i; }"];
 
@@ -844,14 +850,17 @@ mod tests {
                     Expr::Literal(Literal::Integer(4)),
                     Expr::Ident(Ident("testing".to_owned())),
                 ],
+                line: 1,
             },
             CallExpr {
                 func: Box::new(Expr::Ident(Ident("test".to_owned()))),
                 args: vec![Expr::Literal(Literal::Integer(4))],
+                line: 1,
             },
             CallExpr {
                 func: Box::new(Expr::Ident(Ident("test".to_owned()))),
                 args: Vec::new(),
+                line: 1,
             },
         ];
         let expecteds = ["test(4, testing)", "test(4)", "test()"];

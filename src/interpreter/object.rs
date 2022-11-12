@@ -299,15 +299,15 @@ pub enum RuntimeError {
         key: Object,
         line: usize,
     },
-    #[error("cannot iterate through object of type `{obj}`")]
+    #[error("cannot iterate through object of type `{obj}` on line {line}")]
     CannotIterate { obj: Type, line: usize },
-    #[error("not enough function arguments, got {got}, want {want}")]
+    #[error("not enough function arguments, got {got}, want {want} on line {line}")]
     NotEnoughArgs {
         got: usize,
         want: usize,
         line: usize,
     },
-    #[error("type `{obj}` is not callable")]
+    #[error("type `{obj}` is not callable on line {line}")]
     NotCallable { obj: Type, line: usize },
     #[error("cannot use dot operator on type `{obj}` on line {line}")]
     DotOperatorNotSupported { obj: Type, line: usize },
@@ -317,9 +317,9 @@ pub enum RuntimeError {
         obj: Type,
         line: usize,
     },
-    #[error("invalid embed `{name}`, must refer to a component")]
+    #[error("invalid embed `{name}`, must refer to a component on line {line}")]
     InvalidEmbed { name: String, line: usize },
-    #[error("invalid assigned field `{field}`")]
+    #[error("invalid assigned field `{field}` on line {line}")]
     InvalidAssignedField { field: String, line: usize },
 }
 

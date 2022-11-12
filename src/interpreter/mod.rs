@@ -56,6 +56,7 @@ impl Interpreter {
                 value,
                 index,
                 field,
+                line,
             }) => {
                 let val = self.eval_expr(value)?;
                 if index == None && field == None {
@@ -63,19 +64,19 @@ impl Interpreter {
                     return Ok(Object::AbsoluteNil);
                 }
                 let Some(obj) = self.env.borrow().get(&name.0) else {
-                    return Err(RuntimeError::VariableNotFound { name: name.0, line: 1 });
+                    return Err(RuntimeError::VariableNotFound { name: name.0, line });
                 };
                 if let Some(field_name) = field {
                     let Object::Instance(instance) = obj else {
                         return Err(RuntimeError::DotOperatorNotSupported {
                             obj: obj.scurry_type(),
-                            line: 1,
+                            line,
                         });
                     };
                     if !instance.field_values.borrow().contains_key(&field_name.0) {
                         return Err(RuntimeError::InvalidAssignedField {
                             field: field_name.0,
-                            line: 1,
+                            line,
                         });
                     }
                     instance.field_values.borrow_mut().insert(field_name.0, val);
@@ -97,7 +98,7 @@ impl Interpreter {
                                     return Err(RuntimeError::IndexOutOfRange {
                                         obj,
                                         index: *i,
-                                        line: 1,
+                                        line,
                                     });
                                 }
                                 let rev_idx = arr.borrow().len() - 1;
@@ -109,7 +110,7 @@ impl Interpreter {
                                 Err(RuntimeError::IndexOutOfRange {
                                     obj,
                                     index: *i,
-                                    line: 1,
+                                    line,
                                 })
                             } else {
                                 arr.borrow_mut()[idx] = val;
@@ -119,7 +120,7 @@ impl Interpreter {
                         _ => Err(RuntimeError::IndexOperatorNotSupported {
                             obj: obj.scurry_type(),
                             index_type: idx.scurry_type(),
-                            line: 1,
+                            line,
                         }),
                     };
                 }
@@ -157,11 +158,18 @@ impl Interpreter {
                             _ => {
                                 return Err(RuntimeError::InvalidEmbed {
                                     name: embed.name.0,
-                                    // TODO: Line numbers in declarations
-                                    line: 1,
+                                    line: embed.line,
                                 });
                             }
                         };
+                        for assigned in &embed.assigned {
+                            if !fields.contains(assigned) {
+                                return Err(RuntimeError::InvalidAssignedField {
+                                    field: assigned.0.clone(),
+                                    line: embed.line,
+                                });
+                            }
+                        }
                         embedded.push((embed_component, embed.assigned));
                     }
                     embedded
@@ -194,7 +202,8 @@ impl Interpreter {
                 iter_ident,
                 expr,
                 block,
-            }) => self.eval_for_stmt(iter_ident, expr, block),
+                line,
+            }) => self.eval_for_stmt(iter_ident, expr, block, line),
             Stmt::If(IfStmt {
                 condition,
                 true_block,
@@ -243,7 +252,7 @@ impl Interpreter {
                 let expr = self.eval_expr(*left)?;
                 self.eval_dot_expr(expr, field.0, line)
             }
-            Expr::Call(CallExpr { func, args }) => {
+            Expr::Call(CallExpr { func, args, line }) => {
                 let func = self.eval_expr(*func)?;
                 let args = {
                     let mut result = Vec::new();
@@ -252,7 +261,7 @@ impl Interpreter {
                     }
                     result
                 };
-                self.eval_call_expr(func, args)
+                self.eval_call_expr(func, args, line)
             }
             Expr::Prefix(PrefixExpr { left, op, line }) => {
                 let left = self.eval_expr(*left)?;
@@ -622,7 +631,13 @@ impl Interpreter {
         Ok(Object::AbsoluteNil)
     }
 
-    fn eval_for_stmt(&mut self, iter_ident: Ident, expr: Expr, block: Block) -> EvalResult {
+    fn eval_for_stmt(
+        &mut self,
+        iter_ident: Ident,
+        expr: Expr,
+        block: Block,
+        line: usize,
+    ) -> EvalResult {
         let obj = self.eval_expr(expr)?;
         match obj {
             Object::Array(arr) => {
@@ -650,13 +665,12 @@ impl Interpreter {
             }
             _ => Err(RuntimeError::CannotIterate {
                 obj: obj.scurry_type(),
-                // TODO: Line numbers
-                line: 1,
+                line,
             }),
         }
     }
 
-    fn eval_call_expr(&mut self, func: Object, mut args: Vec<Object>) -> EvalResult {
+    fn eval_call_expr(&mut self, func: Object, mut args: Vec<Object>, line: usize) -> EvalResult {
         match func {
             Object::Function {
                 params,
@@ -668,11 +682,10 @@ impl Interpreter {
                     args.insert(0, Object::Instance((*obj).clone()));
                 }
                 if params.len() != args.len() {
-                    // TODO: Line numbers in call exprs
                     return Err(RuntimeError::NotEnoughArgs {
                         got: args.len(),
                         want: params.len(),
-                        line: 1,
+                        line,
                     });
                 }
                 let outer = Rc::clone(&self.env);
@@ -704,7 +717,7 @@ impl Interpreter {
                 if let Some(func) = Rc::clone(&rc_component).methods.get("__new") {
                     let mut new_args = args.clone();
                     new_args.insert(0, Object::Instance(instance.clone()));
-                    self.eval_call_expr(func.clone(), new_args)?;
+                    self.eval_call_expr(func.clone(), new_args, 1)?;
                 }
                 for (embed, assigned) in &Rc::clone(&rc_component).embeds {
                     let mut args = Vec::new();
@@ -714,16 +727,12 @@ impl Interpreter {
                                 .field_values
                                 .borrow()
                                 .get(&field.0)
-                                .ok_or(RuntimeError::InvalidAssignedField {
-                                    field: field.0.clone(),
-                                    // TODO: Line numbers in fields
-                                    line: 1,
-                                })?
+                                .expect("all assigned fields should be in field list")
                                 .clone(),
                         )
                     }
                     let embed_instance =
-                        self.eval_call_expr(Object::Component(embed.clone()), args)?;
+                        self.eval_call_expr(Object::Component(embed.clone()), args, 1)?;
                     if let Object::Instance(inst) = embed_instance {
                         instance.embeds.push(inst);
                     } else {
@@ -733,10 +742,9 @@ impl Interpreter {
                 Ok(Object::Instance(instance))
             }
             // Not a function
-            // TODO: Line numbers in call exprs
             _ => Err(RuntimeError::NotCallable {
                 obj: func.scurry_type(),
-                line: 1,
+                line,
             }),
         }
     }

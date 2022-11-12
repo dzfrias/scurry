@@ -264,7 +264,6 @@ impl<'a> Parser<'a> {
                     Stmt::Assign(self.parse_dot_assign_stmt(Ident(cloned_name))?)
                 } else {
                     // Put the lexer back into its old state
-                    // TODO: Reset position
                     self.current_token = Token::Ident(cloned_name);
                     self.peek_token = Token::Dot;
                     self.lexer = cloned_lex;
@@ -506,6 +505,7 @@ impl<'a> Parser<'a> {
             value,
             field: None,
             index: None,
+            line: self.line,
         })
     }
 
@@ -519,6 +519,7 @@ impl<'a> Parser<'a> {
             value,
             field: Some(field),
             index: None,
+            line: self.line,
         })
     }
 
@@ -531,6 +532,7 @@ impl<'a> Parser<'a> {
             value,
             field: None,
             index: Some(index),
+            line: self.line,
         })
     }
 
@@ -581,6 +583,7 @@ impl<'a> Parser<'a> {
             iter_ident: ident,
             expr,
             block,
+            line: self.line,
         })
     }
 
@@ -642,6 +645,7 @@ impl<'a> Parser<'a> {
                     embeds.push(Embed {
                         name: embed_name,
                         assigned,
+                        line: self.line,
                     })
                 }
                 Token::Function => {
@@ -739,6 +743,7 @@ impl<'a> Parser<'a> {
         Some(CallExpr {
             func: Box::new(left_exp),
             args,
+            line: self.line,
         })
     }
 
@@ -886,6 +891,7 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             index: None,
             field: None,
+            line: 1,
         })];
 
         test_parse!(inputs, expecteds)
@@ -900,6 +906,7 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             index: None,
             field: None,
+            line: 2,
         })];
 
         test_parse!(inputs, expecteds)
@@ -915,6 +922,7 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             field: None,
             index: None,
+            line: 2,
         })];
 
         test_parse!(inputs, expecteds)
@@ -1399,6 +1407,7 @@ mod tests {
                 iter_ident: Ident("i".to_owned()),
                 expr: Expr::Literal(Literal::Integer(1)),
                 block: Block(vec![Stmt::Expr(Expr::Ident(Ident("i".to_owned())))]),
+                line: 1,
             }),
             Stmt::For(ForStmt {
                 iter_ident: Ident("ident".to_owned()),
@@ -1409,6 +1418,7 @@ mod tests {
                     line: 1,
                 }),
                 block: Block(vec![Stmt::Expr(Expr::Ident(Ident("ident".to_owned())))]),
+                line: 1,
             }),
         ];
 
@@ -1450,11 +1460,13 @@ mod tests {
                 iter_ident: Ident("i".to_owned()),
                 expr: Expr::Ident(Ident("x".to_owned())),
                 block: Block(vec![Stmt::Continue]),
+                line: 1,
             }),
             Stmt::For(ForStmt {
                 iter_ident: Ident("i".to_owned()),
                 expr: Expr::Ident(Ident("x".to_owned())),
                 block: Block(vec![Stmt::Break]),
+                line: 1,
             }),
             Stmt::While(WhileStmt {
                 condition: Expr::Literal(Literal::Boolean(true)),
@@ -1584,6 +1596,7 @@ mod tests {
                 block: Block(vec![Stmt::Return(ReturnStmt {
                     value: Expr::Ident(Ident("i".to_owned())),
                 })]),
+                line: 1,
             })]),
         }))];
 
@@ -1627,6 +1640,7 @@ mod tests {
                 embeds: vec![Embed {
                     name: Ident("Testing".to_owned()),
                     assigned: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                    line: 1,
                 }],
             }),
             Stmt::Declaration(DeclarationStmt {
@@ -1646,6 +1660,7 @@ mod tests {
                 embeds: vec![Embed {
                     name: Ident("Testing".to_owned()),
                     assigned: Vec::new(),
+                    line: 1,
                 }],
             }),
         ];
@@ -1663,14 +1678,17 @@ mod tests {
                     Expr::Ident(Ident("x".to_owned())),
                     Expr::Ident(Ident("y".to_owned())),
                 ],
+                line: 1,
             })),
             Stmt::Expr(Expr::Call(CallExpr {
                 func: Box::new(Expr::Ident(Ident("test".to_owned()))),
                 args: vec![Expr::Literal(Literal::Integer(3))],
+                line: 1,
             })),
             Stmt::Expr(Expr::Call(CallExpr {
                 func: Box::new(Expr::Ident(Ident("test".to_owned()))),
                 args: Vec::new(),
+                line: 1,
             })),
         ];
 
@@ -1807,6 +1825,7 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             field: Some(Ident("world".to_owned())),
             index: None,
+            line: 1,
         })];
 
         test_parse!(inputs, expecteds)
@@ -1820,6 +1839,7 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             field: None,
             index: Some(Expr::Literal(Literal::Integer(1))),
+            line: 1,
         })];
 
         test_parse!(inputs, expecteds)
