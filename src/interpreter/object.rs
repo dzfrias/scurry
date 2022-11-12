@@ -148,25 +148,24 @@ impl fmt::Display for Object {
                 write!(f, "{{{}}}", pairs.strip_suffix(", ").unwrap_or_default())
             }
             Self::ReturnVal(obj) => write!(f, "{}", *obj),
-            Self::Function { params, body, .. } => {
+            Self::Function { params, .. } => {
                 let params = params
                     .iter()
                     .map(|ident| ident.to_string() + ", ")
                     .collect::<String>();
                 write!(
                     f,
-                    "fn({}) {body}",
+                    "fn({}) {{ ... }}",
                     params.strip_suffix(", ").unwrap_or_default()
                 )
             }
-            Self::Instance(Instance {
-                component,
-                field_values,
-                embeds,
-            }) => {
-                todo!()
+            Self::Instance(Instance { component, .. }) => {
+                let name = &component.name;
+                write!(f, "instance of type `{}`", name)
             }
-            Self::Component { .. } => todo!(),
+            Self::Component(Component { name, .. }) => {
+                write!(f, "decl {name} {{ ... }}")
+            }
             Self::Nil => write!(f, "Nil"),
         }
     }
