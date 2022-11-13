@@ -9,6 +9,15 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+macro_rules! return_if_not_absnil {
+    ($interpreter:expr, $block:expr) => {{
+        let result = $interpreter.eval_block($block.clone())?;
+        if !result.is_absnil() {
+            return Ok(result);
+        }
+    }};
+}
+
 #[derive(Debug)]
 pub struct Interpreter {
     env: Rc<RefCell<Env>>,
@@ -527,19 +536,19 @@ impl Interpreter {
         elifs: Vec<ElifStmt>,
     ) -> EvalResult {
         if self.eval_expr(condition)?.is_truthy() {
-            self.eval_block(true_block)?;
+            self.eval_block(true_block)
         } else {
             for elif in elifs {
                 if self.eval_expr(elif.condition)?.is_truthy() {
-                    self.eval_block(elif.block)?;
-                    return Ok(Object::AbsoluteNil);
+                    return self.eval_block(elif.block);
                 }
             }
             if let Some(block) = else_block {
-                self.eval_block(block)?;
+                self.eval_block(block)
+            } else {
+                Ok(Object::AbsoluteNil)
             }
         }
-        Ok(Object::AbsoluteNil)
     }
 
     fn eval_index_expr(&mut self, obj: Object, index: Object, line: usize) -> EvalResult {
@@ -640,7 +649,7 @@ impl Interpreter {
 
     fn eval_while_stmt(&mut self, condition: Expr, block: Block) -> EvalResult {
         while self.eval_expr(condition.clone())?.is_truthy() {
-            self.eval_block(block.clone())?;
+            return_if_not_absnil!(self, block.clone());
         }
         Ok(Object::AbsoluteNil)
     }
@@ -657,14 +666,14 @@ impl Interpreter {
             Object::Array(arr) => {
                 for obj in arr.borrow().iter() {
                     self.env.borrow_mut().set(iter_ident.0.clone(), obj.clone());
-                    self.eval_block(block.clone())?;
+                    return_if_not_absnil!(self, block.clone());
                 }
                 Ok(Object::AbsoluteNil)
             }
             Object::Map(map) => {
                 for (key, _) in map.borrow().iter() {
                     self.env.borrow_mut().set(iter_ident.0.clone(), key.clone());
-                    self.eval_block(block.clone())?;
+                    return_if_not_absnil!(self, block.clone());
                 }
                 Ok(Object::AbsoluteNil)
             }
@@ -673,7 +682,7 @@ impl Interpreter {
                     self.env
                         .borrow_mut()
                         .set(iter_ident.0.clone(), Object::String(char.to_string()));
-                    self.eval_block(block.clone())?;
+                    return_if_not_absnil!(self, block.clone());
                 }
                 Ok(Object::AbsoluteNil)
             }
