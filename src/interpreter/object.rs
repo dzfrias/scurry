@@ -127,6 +127,10 @@ impl Object {
             Self::AbsoluteNil => false,
         }
     }
+
+    pub fn is_absnil(&self) -> bool {
+        self == &Self::AbsoluteNil
+    }
 }
 
 impl fmt::Display for Object {

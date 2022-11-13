@@ -29,8 +29,9 @@ fn start_repl() -> Result<()> {
                 let parser = Parser::new(&line);
                 match parser.parse() {
                     Ok(program) => match interpreter.eval_repl(program) {
-                        Ok(obj) => println!("{obj}"),
+                        Ok(obj) if !obj.is_absnil() => println!("{obj}"),
                         Err(err) => println!("{err}"),
+                        _ => {}
                     },
                     Err(errs) => {
                         println!("parser errors:");
