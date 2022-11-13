@@ -214,6 +214,14 @@ impl Interpreter {
                 else_block,
                 elifs,
             }) => self.eval_if_stmt(condition, true_block, else_block, elifs),
+            Stmt::Switch(SwitchStmt {
+                expr,
+                cases,
+                default,
+            }) => {
+                let switch = self.eval_expr(expr)?;
+                self.eval_switch_stmt(switch, cases, default)
+            }
             Stmt::Expr(expr) => self.eval_expr(expr),
             _ => todo!(),
         }
@@ -673,6 +681,26 @@ impl Interpreter {
                 obj: obj.scurry_type(),
                 line,
             }),
+        }
+    }
+
+    fn eval_switch_stmt(
+        &mut self,
+        switch: Object,
+        cases: Vec<Case>,
+        default: Option<Block>,
+    ) -> EvalResult {
+        for case in cases {
+            for condition in case.conditions {
+                if switch == self.eval_expr(condition)? {
+                    return self.eval_block(case.block);
+                }
+            }
+        }
+        if let Some(block) = default {
+            self.eval_block(block)
+        } else {
+            Ok(Object::AbsoluteNil)
         }
     }
 
@@ -1598,5 +1626,17 @@ mod tests {
         }];
 
         runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn eval_switch_stmt() {
+        let inputs = [
+            "switch 3 { case 3 { x = 3; } }; x;",
+            "switch 3 { case 9 | 3 { x = 4; } }; x;",
+            "switch \"hello\" { case \"helo\" { x = 5; } case 3 { x = 3; } default { x = 8; } }; x;"
+        ];
+        let expecteds = [Object::Int(3), Object::Int(4), Object::Int(8)];
+
+        test_eval!(inputs, expecteds)
     }
 }
