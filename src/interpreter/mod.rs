@@ -1,3 +1,4 @@
+mod builtin;
 mod env;
 mod object;
 
@@ -287,6 +288,8 @@ impl Interpreter {
         let val = self.env.borrow().get(name);
         if let Some(val) = val {
             Ok(val)
+        } else if let Some(func) = builtin::get_builtin(name) {
+            Ok(Object::Builtin(func))
         } else {
             Err(RuntimeError::VariableNotFound {
                 name: name.to_owned(),
@@ -744,6 +747,7 @@ impl Interpreter {
                 }
                 Ok(Object::Instance(instance))
             }
+            Object::Builtin(func) => func(args, line),
             // Not a function
             _ => Err(RuntimeError::NotCallable {
                 obj: func.scurry_type(),

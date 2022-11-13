@@ -20,6 +20,8 @@ macro_rules! array {
 #[allow(unused_imports)]
 pub(crate) use array;
 
+pub type BuiltinFunc = fn(Vec<Object>, usize) -> EvalResult;
+
 #[derive(Debug, PartialEq)]
 pub enum Object {
     Int(i32),
@@ -34,6 +36,7 @@ pub enum Object {
         env: Rc<RefCell<Env>>,
         bound: Option<Rc<Instance>>,
     },
+    Builtin(BuiltinFunc),
     Component(Component),
     Instance(Instance),
     ReturnVal(Box<Object>),
@@ -60,6 +63,7 @@ impl Clone for Object {
                 env: Rc::clone(env),
                 bound: bound.clone(),
             },
+            Self::Builtin(builtin) => Self::Builtin(builtin.clone()),
             Self::Nil => Object::Nil,
             Self::AbsoluteNil => Self::AbsoluteNil,
             Self::ReturnVal(obj) => Object::ReturnVal(obj.clone()),
@@ -92,6 +96,7 @@ impl Object {
         match self {
             Self::Int(_) => Type::Int,
             Self::Function { .. } => Type::Function,
+            Self::Builtin(_) => Type::Builtin,
             Self::Float(_) => Type::Float,
             Self::Bool(_) => Type::Bool,
             Self::String(_) => Type::String,
@@ -111,9 +116,10 @@ impl Object {
             Self::Float(f) => *f != 0.0,
             Self::Bool(b) => *b,
             Self::String(s) => !s.is_empty(),
-            Self::Function { .. } => false,
             Self::Array(arr) => !arr.borrow().is_empty(),
             Self::Map(map) => !map.borrow().is_empty(),
+            Self::Function { .. } => false,
+            Self::Builtin(_) => false,
             Self::ReturnVal(_) => false,
             Self::Instance { .. } => false,
             Self::Component { .. } => false,
@@ -164,6 +170,8 @@ impl fmt::Display for Object {
                     params.strip_suffix(", ").unwrap_or_default()
                 )
             }
+            Self::Builtin(_) => write!(f, "<builtin>"),
+
             Self::Instance(Instance { component, .. }) => {
                 let name = &component.name;
                 write!(f, "instance of type `{}`", name)
@@ -187,6 +195,7 @@ pub enum Type {
     Array,
     Map,
     Function,
+    Builtin,
     Instance(String),
     Component,
     Method,
@@ -201,6 +210,7 @@ impl fmt::Display for Type {
             Self::String => write!(f, "String"),
             Self::Array => write!(f, "Array"),
             Self::Nil => write!(f, "Nil"),
+            Self::Builtin => write!(f, "Builtin"),
             Self::Map => write!(f, "Map"),
             Self::Function => write!(f, "Function"),
             Self::Component => write!(f, "Component"),
