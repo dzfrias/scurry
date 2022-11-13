@@ -720,7 +720,7 @@ impl Interpreter {
                     )),
                     embeds: Vec::new(),
                 };
-                if let Some(func) = Rc::clone(&rc_component).methods.get("__new") {
+                if let Some(func) = Rc::clone(&rc_component).methods.get("$new") {
                     let mut new_args = args.clone();
                     new_args.insert(0, Object::Instance(instance.clone()));
                     self.eval_call_expr(func.clone(), new_args, 1)?;
@@ -1375,7 +1375,7 @@ mod tests {
     fn eval_embed_in_decl_statement() {
         let inputs = [
             "decl Test { fn x(self, y) {} }; decl Test2 { [Test] {} }; Test2;",
-            "decl Test { fn __new(self, param) {} }; decl Test2 { field [Test] { field } }; Test2;",
+            "decl Test { fn $new(self, param) {} }; decl Test2 { field [Test] { field } }; Test2;",
         ];
         let expecteds = [
             Object::Component(Component {
@@ -1415,7 +1415,7 @@ mod tests {
                         methods: {
                             let mut map = HashMap::new();
                             map.insert(
-                                "__new".to_owned(),
+                                "$new".to_owned(),
                                 Object::Function {
                                     params: vec![
                                         Ident("self".to_owned()),
@@ -1442,7 +1442,7 @@ mod tests {
     fn eval_object_instance() {
         let inputs = [
             "decl Test { field }; Test();",
-            "decl Test { fn __new(self, x) {} }; Test(3);",
+            "decl Test { fn $new(self, x) {} }; Test(3);",
         ];
         let expecteds = [
             Object::Instance(Instance {
@@ -1466,7 +1466,7 @@ mod tests {
                     methods: {
                         let mut map = HashMap::new();
                         map.insert(
-                            "__new".to_owned(),
+                            "$new".to_owned(),
                             Object::Function {
                                 params: vec![Ident("self".to_owned()), Ident("x".to_owned())],
                                 body: Block(Vec::new()),
@@ -1550,7 +1550,7 @@ mod tests {
     #[test]
     fn invalid_assigned_field() {
         let inputs =
-            ["decl Test { fn __new(self, x) {} }; decl Test2 { [Test] { field } }; Test2();"];
+            ["decl Test { fn $new(self, x) {} }; decl Test2 { [Test] { field } }; Test2();"];
         let errs = [RuntimeError::InvalidAssignedField {
             field: "field".to_owned(),
             line: 1,
@@ -1562,7 +1562,7 @@ mod tests {
     #[test]
     fn field_assignment() {
         let inputs =
-            ["decl Test { field fn __new(self) { self.field = 5; } }; x = Test(); x.field;"];
+            ["decl Test { field fn $new(self) { self.field = 5; } }; x = Test(); x.field;"];
         let expecteds = [Object::Int(5)];
 
         test_eval!(inputs, expecteds)

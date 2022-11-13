@@ -36,6 +36,8 @@ pub enum Token {
     Dot,
     #[token("|")]
     Pipe,
+    #[token("$")]
+    Dollar,
 
     #[token("<")]
     Lt,
@@ -139,6 +141,7 @@ impl fmt::Display for Token {
             Token::Dot => write!(f, "."),
             Token::Pipe => write!(f, "|"),
             Token::Lt => write!(f, "<"),
+            Token::Dollar => write!(f, "$"),
             Token::Gt => write!(f, ">"),
             Token::Eq => write!(f, "=="),
             Token::NotEq => write!(f, "!="),
@@ -514,6 +517,12 @@ mod tests {
     fn tokenizes_pipe() {
         let mut lexer = Token::lexer("|");
         assert_eq!(Token::Pipe, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_dollar() {
+        let mut lexer = Token::lexer("$");
+        assert_eq!(Token::Dollar, lexer.next().expect("Should lex something"));
     }
 
     #[test]

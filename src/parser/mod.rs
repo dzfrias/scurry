@@ -132,6 +132,7 @@ impl From<&Token> for Precedence {
 pub enum ScopeType {
     Function,
     Loop,
+    Decl,
 }
 
 impl fmt::Display for ScopeType {
@@ -139,6 +140,7 @@ impl fmt::Display for ScopeType {
         match self {
             Self::Function => write!(f, "function"),
             Self::Loop => write!(f, "loop"),
+            Self::Decl => write!(f, "decl"),
         }
     }
 }
@@ -630,8 +632,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function_stmt(&mut self) -> Option<FunctionStmt> {
+        let mut special = false;
+        if self.peek_token == Token::Dollar {
+            self.next_token();
+            self.scopes_contain(ScopeType::Decl)?;
+            special = true;
+        }
         self.next_token();
-        let name = self.parse_ident()?;
+        let name = {
+            let mut name = self.parse_ident()?;
+            if special {
+                // Flags as special because idents cannot contain '$'
+                name.0.insert(0, '$');
+            }
+            name
+        };
         self.expect_peek(Token::Lparen)?;
         let params = self.parse_function_params()?;
         self.expect_peek(Token::Lbrace)?;
@@ -681,7 +696,9 @@ impl<'a> Parser<'a> {
                     })
                 }
                 Token::Function => {
+                    self.scope_stack.push(ScopeType::Decl);
                     let function = self.parse_function_stmt()?;
+                    self.scope_stack.pop().expect("should have scope on stack");
                     methods.push(function);
                 }
                 _ => self.errors.push(ParserError::ExpectedAnyOf {
