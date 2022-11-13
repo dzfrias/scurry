@@ -63,7 +63,7 @@ impl Clone for Object {
                 env: Rc::clone(env),
                 bound: bound.clone(),
             },
-            Self::Builtin(builtin) => Self::Builtin(builtin.clone()),
+            Self::Builtin(builtin) => Self::Builtin(*builtin),
             Self::Nil => Object::Nil,
             Self::AbsoluteNil => Self::AbsoluteNil,
             Self::ReturnVal(obj) => Object::ReturnVal(obj.clone()),
