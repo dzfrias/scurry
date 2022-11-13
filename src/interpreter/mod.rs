@@ -9,11 +9,17 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-macro_rules! return_if_not_absnil {
+macro_rules! loop_control {
     ($interpreter:expr, $block:expr) => {{
         let result = $interpreter.eval_block($block.clone())?;
-        if !result.is_absnil() {
+        if matches!(result, Object::ControlChange(ControlChange::Return(_))) {
             return Ok(result);
+        }
+        if matches!(result, Object::ControlChange(ControlChange::Continue)) {
+            continue;
+        }
+        if matches!(result, Object::ControlChange(ControlChange::Break)) {
+            break;
         }
     }};
 }
@@ -42,7 +48,7 @@ impl Interpreter {
         for stmt in program.0 {
             result = self.eval_stmt(stmt)?;
             // Get rid of return val wrappers, no longer needed
-            if let Object::ReturnVal(val) = result {
+            if let Object::ControlChange(ControlChange::Return(val)) = result {
                 result = *val
             }
         }
@@ -52,7 +58,7 @@ impl Interpreter {
     fn eval_block(&mut self, block: Block) -> EvalResult {
         for stmt in block.0 {
             let result = self.eval_stmt(stmt)?;
-            if matches!(result, Object::ReturnVal(_)) {
+            if matches!(result, Object::ControlChange(_)) {
                 return Ok(result);
             }
         }
@@ -140,9 +146,11 @@ impl Interpreter {
                 Ok(Object::AbsoluteNil)
             }
             Stmt::While(WhileStmt { condition, block }) => self.eval_while_stmt(condition, block),
-            Stmt::Return(ReturnStmt { value }) => {
-                Ok(Object::ReturnVal(Box::new(self.eval_expr(value)?)))
-            }
+            Stmt::Return(ReturnStmt { value }) => Ok(Object::ControlChange(ControlChange::Return(
+                Box::new(self.eval_expr(value)?),
+            ))),
+            Stmt::Break => Ok(Object::ControlChange(ControlChange::Break)),
+            Stmt::Continue => Ok(Object::ControlChange(ControlChange::Continue)),
             Stmt::Function(FunctionStmt {
                 name,
                 params,
@@ -232,7 +240,6 @@ impl Interpreter {
                 self.eval_switch_stmt(switch, cases, default)
             }
             Stmt::Expr(expr) => self.eval_expr(expr),
-            _ => todo!(),
         }
     }
 
@@ -649,7 +656,7 @@ impl Interpreter {
 
     fn eval_while_stmt(&mut self, condition: Expr, block: Block) -> EvalResult {
         while self.eval_expr(condition.clone())?.is_truthy() {
-            return_if_not_absnil!(self, block.clone());
+            loop_control!(self, block.clone());
         }
         Ok(Object::AbsoluteNil)
     }
@@ -666,14 +673,14 @@ impl Interpreter {
             Object::Array(arr) => {
                 for obj in arr.borrow().iter() {
                     self.env.borrow_mut().set(iter_ident.0.clone(), obj.clone());
-                    return_if_not_absnil!(self, block.clone());
+                    loop_control!(self, block.clone());
                 }
                 Ok(Object::AbsoluteNil)
             }
             Object::Map(map) => {
                 for (key, _) in map.borrow().iter() {
                     self.env.borrow_mut().set(iter_ident.0.clone(), key.clone());
-                    return_if_not_absnil!(self, block.clone());
+                    loop_control!(self, block.clone());
                 }
                 Ok(Object::AbsoluteNil)
             }
@@ -682,7 +689,7 @@ impl Interpreter {
                     self.env
                         .borrow_mut()
                         .set(iter_ident.0.clone(), Object::String(char.to_string()));
-                    return_if_not_absnil!(self, block.clone());
+                    loop_control!(self, block.clone());
                 }
                 Ok(Object::AbsoluteNil)
             }
@@ -1645,6 +1652,35 @@ mod tests {
             "switch \"hello\" { case \"helo\" { x = 5; } case 3 { x = 3; } default { x = 8; } }; x;"
         ];
         let expecteds = [Object::Int(3), Object::Int(4), Object::Int(8)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn return_from_nested_block() {
+        let inputs = [
+            "fn x(y) { for i in y { return i; } }; x([1, 2, 3]);",
+            "fn x() { while True { return 3; } }; x();",
+            "fn x() { if True { return 3; } }; x();",
+            "fn x() { switch 3 { case 3 { return 4; } } }; x();",
+        ];
+        let expecteds = [
+            Object::Int(1),
+            Object::Int(3),
+            Object::Int(3),
+            Object::Int(4),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_break_and_continue() {
+        let inputs = [
+            "y = 0; for i in [1, 2, 3] { break; y = y + 1; }; y;",
+            "y = 0; for i in [1, 2, 3] { if i == 2 { continue; }; y = y + 1; }; y;",
+        ];
+        let expecteds = [Object::Int(0), Object::Int(2)];
 
         test_eval!(inputs, expecteds)
     }

@@ -39,7 +39,7 @@ pub enum Object {
     Builtin(BuiltinFunc),
     Component(Component),
     Instance(Instance),
-    ReturnVal(Box<Object>),
+    ControlChange(ControlChange),
     Nil,
     // Only used for statements, that return absolutely nothing
     AbsoluteNil,
@@ -66,7 +66,7 @@ impl Clone for Object {
             Self::Builtin(builtin) => Self::Builtin(*builtin),
             Self::Nil => Object::Nil,
             Self::AbsoluteNil => Self::AbsoluteNil,
-            Self::ReturnVal(obj) => Object::ReturnVal(obj.clone()),
+            Self::ControlChange(control) => Object::ControlChange(control.clone()),
             Self::Instance(instance) => Object::Instance(instance.clone()),
             Self::Component(component) => Object::Component(component.clone()),
             Self::Map(map) => Object::Map(Rc::clone(map)),
@@ -106,7 +106,7 @@ impl Object {
             Self::Component { .. } => Type::Component,
             Self::Nil => Type::Nil,
             Self::AbsoluteNil => Type::Nil,
-            Self::ReturnVal(_) => Type::Nil,
+            Self::ControlChange(_) => Type::Nil,
         }
     }
 
@@ -120,7 +120,7 @@ impl Object {
             Self::Map(map) => !map.borrow().is_empty(),
             Self::Function { .. } => false,
             Self::Builtin(_) => false,
-            Self::ReturnVal(_) => false,
+            Self::ControlChange(_) => false,
             Self::Instance { .. } => false,
             Self::Component { .. } => false,
             Self::Nil => false,
@@ -162,7 +162,7 @@ impl fmt::Display for Object {
                     .collect::<String>();
                 write!(f, "{{{}}}", pairs.strip_suffix(", ").unwrap_or_default())
             }
-            Self::ReturnVal(obj) => write!(f, "{}", *obj),
+            Self::ControlChange(_) => write!(f, "<control_breaker>"),
             Self::Function { params, .. } => {
                 let params = params
                     .iter()
@@ -247,6 +247,13 @@ impl Clone for Instance {
             embeds: self.embeds.clone(),
         }
     }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum ControlChange {
+    Return(Box<Object>),
+    Break,
+    Continue,
 }
 
 #[derive(Debug, PartialEq)]
