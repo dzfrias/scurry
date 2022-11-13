@@ -1,9 +1,9 @@
 use clap::Parser as ArgParser;
 use rustyline::error::ReadlineError;
 use rustyline::{Config, Editor, Result};
-use scurry::format_position;
+use scurry;
 use scurry::interpreter::Interpreter;
-use scurry::parser::{Parser, ParserError};
+use scurry::parser::Parser;
 use std::process;
 
 #[derive(Debug, ArgParser)]
@@ -38,29 +38,7 @@ fn start_repl() -> Result<()> {
                         for err in errs {
                             let s = err.to_string();
                             println!();
-                            match err {
-                                ParserError::ExpectedToken { pos, .. } => {
-                                    println!("{}", format_position(&line, pos))
-                                }
-                                ParserError::ExpectedAnyOf { pos, .. } => {
-                                    println!("{}", format_position(&line, pos))
-                                }
-                                ParserError::InvalidIdent { pos, .. } => {
-                                    println!("{}", format_position(&line, pos))
-                                }
-                                ParserError::IllegalCharacter { pos } => {
-                                    println!("{}", format_position(&line, pos));
-                                }
-                                ParserError::UnteriminatedString { pos } => {
-                                    println!("{}", format_position(&line, pos));
-                                }
-                                ParserError::InvalidPrefixOperator { pos, .. } => {
-                                    println!("{}", format_position(&line, pos));
-                                }
-                                ParserError::InvalidKeywordInScope { pos, .. } => {
-                                    println!("{}", format_position(&line, pos));
-                                }
-                            }
+                            println!("{}", err.position().format_on_source(&line));
                             println!("{s}");
                         }
                     }

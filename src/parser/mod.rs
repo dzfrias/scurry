@@ -19,6 +19,24 @@ impl Position {
     pub fn range(&self) -> &Range<usize> {
         &self.range
     }
+
+    pub fn format_on_source(&self, source: &str) -> String {
+        let mut res = String::new();
+        let line = self.line;
+        res.push_str(&format!(
+            "{}: {}",
+            line,
+            source
+                .lines()
+                .nth(line - 1)
+                .expect("Line should be in source")
+        ));
+        res.push('\n');
+        res.push_str(&(" ".repeat(line.to_string().len()) + "  "));
+        res.push_str(&" ".repeat(self.range.start));
+        res.push_str(&"^".repeat(self.range.len()));
+        res
+    }
 }
 
 impl fmt::Display for Position {
@@ -64,6 +82,20 @@ pub enum ParserError {
         expect_scope: ScopeType,
         pos: Position,
     },
+}
+
+impl ParserError {
+    pub fn position(&self) -> &Position {
+        match self {
+            Self::ExpectedToken { pos, .. } => pos,
+            Self::InvalidKeywordInScope { pos, .. } => pos,
+            Self::InvalidIdent { pos, .. } => pos,
+            Self::ExpectedAnyOf { pos, .. } => pos,
+            Self::IllegalCharacter { pos } => pos,
+            Self::UnteriminatedString { pos } => pos,
+            Self::InvalidPrefixOperator { pos, .. } => pos,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, PartialOrd)]
