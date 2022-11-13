@@ -1039,7 +1039,7 @@ mod tests {
 
     #[test]
     fn parser_throws_error_at_invalid_tokens() {
-        let inputs = ["#", "$", "&"];
+        let inputs = ["#", "@", "&"];
         let errs = [
             ParserError::IllegalCharacter {
                 pos: Position {
