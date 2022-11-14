@@ -905,6 +905,17 @@ impl Interpreter {
                     line,
                 }),
             },
+            Object::Map(_) => match builtin::get_map_method(&field) {
+                Some(method) => Ok(Object::BuiltinMethod {
+                    bound: Box::new(left),
+                    function: method,
+                }),
+                None => Err(RuntimeError::UnrecognizedField {
+                    field,
+                    obj: Type::Map,
+                    line,
+                }),
+            },
             _ => Err(RuntimeError::DotOperatorNotSupported {
                 obj: left.scurry_type(),
                 line,
@@ -921,6 +932,8 @@ impl Default for Interpreter {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use super::*;
     use crate::parser::Parser;
 
