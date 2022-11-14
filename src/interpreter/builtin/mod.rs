@@ -1,6 +1,7 @@
 mod array;
 mod functions;
 mod map;
+mod string;
 
 use super::object::*;
 
@@ -25,6 +26,14 @@ pub fn get_map_method(name: &str) -> Option<BuiltinMethod> {
     match name {
         "keys" => Some(map::keys),
         "values" => Some(map::values),
+        _ => None,
+    }
+}
+
+pub fn get_string_method(name: &str) -> Option<BuiltinMethod> {
+    match name {
+        "len" => Some(string::len),
+        "trim" => Some(string::trim),
         _ => None,
     }
 }

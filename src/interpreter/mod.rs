@@ -894,6 +894,7 @@ impl Interpreter {
                     }
                 },
             },
+
             Object::Array(_) => match builtin::get_array_method(&field) {
                 Some(method) => Ok(Object::BuiltinMethod {
                     bound: Box::new(left),
@@ -905,6 +906,7 @@ impl Interpreter {
                     line,
                 }),
             },
+
             Object::Map(_) => match builtin::get_map_method(&field) {
                 Some(method) => Ok(Object::BuiltinMethod {
                     bound: Box::new(left),
@@ -916,6 +918,19 @@ impl Interpreter {
                     line,
                 }),
             },
+
+            Object::String(_) => match builtin::get_string_method(&field) {
+                Some(method) => Ok(Object::BuiltinMethod {
+                    bound: Box::new(left),
+                    function: method,
+                }),
+                None => Err(RuntimeError::UnrecognizedField {
+                    field,
+                    obj: Type::String,
+                    line,
+                }),
+            },
+
             _ => Err(RuntimeError::DotOperatorNotSupported {
                 obj: left.scurry_type(),
                 line,
@@ -1822,6 +1837,22 @@ mod tests {
             Object::Array(Rc::new(RefCell::new(vec![Object::Int(1), Object::Int(2)]))),
             Object::Int(3),
         ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtin_string_len() {
+        let inputs = ["\"test\".len();"];
+        let expecteds = [Object::Int(4)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtin_string_trim() {
+        let inputs = ["\"test     \".trim();"];
+        let expecteds = [Object::String("test".to_owned())];
 
         test_eval!(inputs, expecteds)
     }
