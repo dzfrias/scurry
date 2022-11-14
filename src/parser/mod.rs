@@ -687,18 +687,13 @@ impl<'a> Parser<'a> {
                     let embed_name = self.parse_ident()?;
                     self.expect_peek(Token::Rbracket)?;
                     self.expect_peek(Token::Lbrace)?;
-                    self.next_token();
                     let mut assigned = Vec::new();
-                    if self.current_token != Token::Rbrace {
+                    while self.peek_token != Token::Rbrace {
+                        self.next_token();
                         assigned.push(self.parse_ident()?);
-                        while self.peek_token == Token::Comma {
-                            self.next_token();
-                            self.next_token();
-                            let field = self.parse_ident()?;
-                            assigned.push(field);
-                        }
-                        self.expect_peek(Token::Rbrace)?;
                     }
+                    self.expect_peek(Token::Rbrace)
+                        .expect("should end on rbrace");
                     embeds.push(Embed {
                         name: embed_name,
                         assigned,
@@ -1671,7 +1666,7 @@ mod tests {
         let inputs = [
             "decl Test { field1 field2 }",
             "decl Test { field1 field2 fn xy(x, y) { 1; } }",
-            "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] { field1, field2 } }",
+            "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] { field1 field2 } }",
             "decl Test {}",
             "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] {} }",
         ];

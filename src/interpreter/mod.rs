@@ -754,7 +754,11 @@ impl Interpreter {
                 self.env = Rc::new(RefCell::new(func_env));
                 let result = self.eval_block(body)?;
                 self.env = outer;
-                Ok(result)
+                if let Object::ControlChange(ControlChange::Return(val)) = result {
+                    Ok(*val)
+                } else {
+                    Ok(result)
+                }
             }
             Object::Component(component) => {
                 let rc_component = Rc::new(component);
