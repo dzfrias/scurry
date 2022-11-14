@@ -114,6 +114,8 @@ pub enum Token {
     Newline,
     #[regex(r"[ \t\f]+")]
     HorizontalWhitespace,
+    #[regex(r"//.*", logos::skip)]
+    Comment,
 
     #[error]
     Error,
@@ -177,6 +179,7 @@ impl fmt::Display for Token {
             Token::Declaration => write!(f, "decl"),
             Token::EOF => write!(f, "EOF"),
             Token::Newline => write!(f, "NEWLINE"),
+            Token::Comment => write!(f, "COMMENT"),
             Token::HorizontalWhitespace => write!(f, "WHITESPACE"),
             Token::Error => write!(f, "ERROR"),
             Token::ErrorUnterminatedString => write!(f, "ERRORUNTERMINATEDSTRING"),
