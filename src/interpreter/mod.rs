@@ -1651,10 +1651,10 @@ mod tests {
 
     #[test]
     fn invalid_use_of_dot_operator() {
-        let inputs = ["\"hello\".world;", "3.3.test;"];
+        let inputs = ["True.field;", "3.3.test;"];
         let errs = [
             RuntimeError::DotOperatorNotSupported {
-                obj: Type::String,
+                obj: Type::Bool,
                 line: 1,
             },
             RuntimeError::DotOperatorNotSupported {
