@@ -317,7 +317,7 @@ impl Interpreter {
         let val = self.env.borrow().get(name);
         if let Some(val) = val {
             Ok(val)
-        } else if let Some(func) = builtin::get_builtin(name) {
+        } else if let Some(func) = builtin::get_builtin_func(name) {
             Ok(Object::Builtin(func))
         } else {
             Err(RuntimeError::VariableNotFound {
@@ -798,6 +798,9 @@ impl Interpreter {
                 Ok(Object::Instance(instance))
             }
             Object::Builtin(func) => func(args, line),
+            Object::BuiltinMethod { bound, function } => {
+                function(*bound, args, line).expect("bound type should match")
+            }
             // Not a function
             _ => Err(RuntimeError::NotCallable {
                 obj: func.scurry_type(),
@@ -890,6 +893,17 @@ impl Interpreter {
                         })
                     }
                 },
+            },
+            Object::Array(_) => match builtin::get_array_method(&field) {
+                Some(method) => Ok(Object::BuiltinMethod {
+                    bound: Box::new(left),
+                    function: method,
+                }),
+                None => Err(RuntimeError::UnrecognizedField {
+                    field,
+                    obj: Type::Array,
+                    line,
+                }),
             },
             _ => Err(RuntimeError::DotOperatorNotSupported {
                 obj: left.scurry_type(),
@@ -1739,6 +1753,64 @@ mod tests {
             "y = 0; for i in [1, 2, 3] { if i == 2 { continue; }; y = y + 1; }; y;",
         ];
         let expecteds = [Object::Int(0), Object::Int(2)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtin_type() {
+        let inputs = ["type(3);", "type([1, 2, 3]);"];
+        let expecteds = [
+            Object::String("Int".to_owned()),
+            Object::String("Array".to_owned()),
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtins_error_with_wrong_number_of_args() {
+        let inputs = ["type(3, 3);"];
+        let errs = [RuntimeError::NotEnoughArgs {
+            got: 2,
+            want: 1,
+            line: 1,
+        }];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn builtin_array_push() {
+        let inputs = ["x = [1, 2, 3]; x.push(3); x;", "[1, 2, 3].push(4);"];
+        let expecteds = [
+            Object::Array(Rc::new(RefCell::new(vec![
+                Object::Int(1),
+                Object::Int(2),
+                Object::Int(3),
+                Object::Int(3),
+            ]))),
+            Object::Nil,
+        ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtin_array_len() {
+        let inputs = ["[1, 2, 2].len();"];
+        let expecteds = [Object::Int(3)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtin_array_pop() {
+        let inputs = ["x = [1, 2, 3]; x.pop(); x;", "[1, 2, 3].pop();"];
+        let expecteds = [
+            Object::Array(Rc::new(RefCell::new(vec![Object::Int(1), Object::Int(2)]))),
+            Object::Int(3),
+        ];
 
         test_eval!(inputs, expecteds)
     }

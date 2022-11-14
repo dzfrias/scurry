@@ -21,6 +21,7 @@ macro_rules! array {
 pub(crate) use array;
 
 pub type BuiltinFunc = fn(Vec<Object>, usize) -> EvalResult;
+pub type BuiltinMethod = fn(Object, Vec<Object>, usize) -> Option<EvalResult>;
 
 #[derive(Debug, PartialEq)]
 pub enum Object {
@@ -37,6 +38,10 @@ pub enum Object {
         bound: Option<Rc<Instance>>,
     },
     Builtin(BuiltinFunc),
+    BuiltinMethod {
+        bound: Box<Object>,
+        function: BuiltinMethod,
+    },
     Component(Component),
     Instance(Instance),
     ControlChange(ControlChange),
@@ -64,6 +69,10 @@ impl Clone for Object {
                 bound: bound.clone(),
             },
             Self::Builtin(builtin) => Self::Builtin(*builtin),
+            Self::BuiltinMethod { bound, function } => Self::BuiltinMethod {
+                bound: bound.clone(),
+                function: *function,
+            },
             Self::Nil => Object::Nil,
             Self::AbsoluteNil => Self::AbsoluteNil,
             Self::ControlChange(control) => Object::ControlChange(control.clone()),
@@ -97,6 +106,7 @@ impl Object {
             Self::Int(_) => Type::Int,
             Self::Function { .. } => Type::Function,
             Self::Builtin(_) => Type::Builtin,
+            Self::BuiltinMethod { .. } => Type::Builtin,
             Self::Float(_) => Type::Float,
             Self::Bool(_) => Type::Bool,
             Self::String(_) => Type::String,
@@ -120,6 +130,7 @@ impl Object {
             Self::Map(map) => !map.borrow().is_empty(),
             Self::Function { .. } => false,
             Self::Builtin(_) => false,
+            Self::BuiltinMethod { .. } => false,
             Self::ControlChange(_) => false,
             Self::Instance { .. } => false,
             Self::Component { .. } => false,
@@ -174,7 +185,7 @@ impl fmt::Display for Object {
                     params.strip_suffix(", ").unwrap_or_default()
                 )
             }
-            Self::Builtin(_) => write!(f, "<builtin>"),
+            Self::Builtin(_) | Self::BuiltinMethod { .. } => write!(f, "<builtin>"),
 
             Self::Instance(Instance { component, .. }) => {
                 let name = &component.name;
