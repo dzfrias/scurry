@@ -1,5 +1,7 @@
 mod array;
+mod float;
 mod functions;
+mod int;
 mod map;
 mod string;
 
@@ -34,6 +36,22 @@ pub fn get_string_method(name: &str) -> Option<BuiltinMethod> {
     match name {
         "len" => Some(string::len),
         "trim" => Some(string::trim),
+        _ => None,
+    }
+}
+
+pub fn get_int_method(name: &str) -> Option<BuiltinMethod> {
+    match name {
+        "abs" => Some(int::abs),
+        "to_float" => Some(int::to_float),
+        _ => None,
+    }
+}
+
+pub fn get_float_method(name: &str) -> Option<BuiltinMethod> {
+    match name {
+        "abs" => Some(float::abs),
+        "to_int" => Some(float::to_int),
         _ => None,
     }
 }

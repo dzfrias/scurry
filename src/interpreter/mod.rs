@@ -350,6 +350,7 @@ impl Interpreter {
     fn eval_minus_op(&self, expr: Object, line: usize) -> EvalResult {
         match expr {
             Object::Int(i) => Ok(Object::Int(-i)),
+            Object::Float(f) => Ok(Object::Float(-f)),
             _ => Err(RuntimeError::InvalidUnaryOperand {
                 op: PrefixOp::Minus,
                 operand: expr.scurry_type(),
@@ -361,6 +362,7 @@ impl Interpreter {
     fn eval_plus_op(&self, expr: Object, line: usize) -> EvalResult {
         match expr {
             Object::Int(_) => Ok(expr),
+            Object::Float(_) => Ok(expr),
             _ => Err(RuntimeError::InvalidUnaryOperand {
                 op: PrefixOp::Plus,
                 operand: expr.scurry_type(),
@@ -927,6 +929,30 @@ impl Interpreter {
                 None => Err(RuntimeError::UnrecognizedField {
                     field,
                     obj: Type::String,
+                    line,
+                }),
+            },
+
+            Object::Int(_) => match builtin::get_int_method(&field) {
+                Some(method) => Ok(Object::BuiltinMethod {
+                    bound: Box::new(left),
+                    function: method,
+                }),
+                None => Err(RuntimeError::UnrecognizedField {
+                    field,
+                    obj: Type::Int,
+                    line,
+                }),
+            },
+
+            Object::Float(_) => match builtin::get_float_method(&field) {
+                Some(method) => Ok(Object::BuiltinMethod {
+                    bound: Box::new(left),
+                    function: method,
+                }),
+                None => Err(RuntimeError::UnrecognizedField {
+                    field,
+                    obj: Type::Float,
                     line,
                 }),
             },
@@ -1651,17 +1677,11 @@ mod tests {
 
     #[test]
     fn invalid_use_of_dot_operator() {
-        let inputs = ["True.field;", "3.3.test;"];
-        let errs = [
-            RuntimeError::DotOperatorNotSupported {
-                obj: Type::Bool,
-                line: 1,
-            },
-            RuntimeError::DotOperatorNotSupported {
-                obj: Type::Float,
-                line: 1,
-            },
-        ];
+        let inputs = ["True.field;"];
+        let errs = [RuntimeError::DotOperatorNotSupported {
+            obj: Type::Bool,
+            line: 1,
+        }];
 
         runtime_error_eval!(inputs, errs)
     }
@@ -1853,6 +1873,38 @@ mod tests {
     fn builtin_string_trim() {
         let inputs = ["\"test     \".trim();"];
         let expecteds = [Object::String("test".to_owned())];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtin_int_abs() {
+        let inputs = ["(-1).abs();", "1.abs();"];
+        let expecteds = [Object::Int(1), Object::Int(1)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtin_int_to_float() {
+        let inputs = ["1.to_float();"];
+        let expecteds = [Object::Float(1.0)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtin_float_abs() {
+        let inputs = ["(-1.0).abs();", "1.0.abs();"];
+        let expecteds = [Object::Float(1.0), Object::Float(1.0)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn builtin_float_to_int() {
+        let inputs = ["1.4.to_int();", "1.0.to_int();", "1.8.to_int();"];
+        let expecteds = [Object::Int(1), Object::Int(1), Object::Int(1)];
 
         test_eval!(inputs, expecteds)
     }
