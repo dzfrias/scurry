@@ -79,70 +79,67 @@ impl Interpreter {
                     self.env.borrow_mut().set(name.0, val);
                     return Ok(Object::AbsoluteNil);
                 }
-                let env_obj = self.env.borrow().get(&name.0);
-                if let Some(obj) = env_obj {
-                    if let Some(field_name) = field {
-                        if let Object::Instance(instance) = obj {
-                            if !instance.field_values.borrow().contains_key(&field_name.0) {
-                                return Err(RuntimeError::InvalidAssignedField {
-                                    field: field_name.0,
-                                    line,
-                                });
-                            }
-                            instance.field_values.borrow_mut().insert(field_name.0, val);
-                            return Ok(Object::AbsoluteNil);
-                        } else {
-                            return Err(RuntimeError::DotOperatorNotSupported {
-                                obj: obj.scurry_type(),
-                                line,
-                            });
-                        }
+                let Some(obj) = self.env.borrow().get(&name.0) else {
+                    return Err(RuntimeError::VariableNotFound { name: name.0, line });
+                };
+                if let Some(field_name) = field {
+                    let Object::Instance(instance) = obj else {
+                        return Err(RuntimeError::DotOperatorNotSupported {
+                            obj: obj.scurry_type(),
+                            line,
+                        });
+                    };
+                    if !instance.field_values.borrow().contains_key(&field_name.0) {
+                        return Err(RuntimeError::InvalidAssignedField {
+                            field: field_name.0,
+                            line,
+                        });
                     }
-                    if let Some(index) = index {
-                        let idx = self.eval_expr(index)?;
-                        return match (&obj, &idx) {
-                            (
-                                Object::Map(map),
-                                Object::Int(_) | Object::String(_) | Object::Bool(_),
-                            ) => {
-                                map.borrow_mut().insert(idx, val);
-                                Ok(Object::AbsoluteNil)
-                            }
-                            (Object::Array(arr), Object::Int(i)) => {
-                                if *i < 0 {
-                                    if i.unsigned_abs() as usize > arr.borrow().len() {
-                                        return Err(RuntimeError::IndexOutOfRange {
-                                            obj,
-                                            index: *i,
-                                            line,
-                                        });
-                                    }
-                                    let rev_idx = arr.borrow().len() - 1;
-                                    arr.borrow_mut()[rev_idx] = val;
-                                    return Ok(Object::AbsoluteNil);
-                                }
-                                let idx = *i as usize;
-                                if arr.borrow().len() == 0 || idx > arr.borrow().len() - 1 {
-                                    Err(RuntimeError::IndexOutOfRange {
+                    instance.field_values.borrow_mut().insert(field_name.0, val);
+                    return Ok(Object::AbsoluteNil);
+                }
+                if let Some(index) = index {
+                    let idx = self.eval_expr(index)?;
+                    return match (&obj, &idx) {
+                        (
+                            Object::Map(map),
+                            Object::Int(_) | Object::String(_) | Object::Bool(_),
+                        ) => {
+                            map.borrow_mut().insert(idx, val);
+                            Ok(Object::AbsoluteNil)
+                        }
+                        (Object::Array(arr), Object::Int(i)) => {
+                            if *i < 0 {
+                                if i.unsigned_abs() as usize > arr.borrow().len() {
+                                    return Err(RuntimeError::IndexOutOfRange {
                                         obj,
                                         index: *i,
                                         line,
-                                    })
-                                } else {
-                                    arr.borrow_mut()[idx] = val;
-                                    Ok(Object::AbsoluteNil)
+                                    });
                                 }
+                                let rev_idx = arr.borrow().len() - 1;
+                                arr.borrow_mut()[rev_idx] = val;
+                                return Ok(Object::AbsoluteNil);
                             }
-                            _ => Err(RuntimeError::IndexOperatorNotSupported {
-                                obj: obj.scurry_type(),
-                                index_type: idx.scurry_type(),
-                                line,
-                            }),
-                        };
-                    }
-                } else {
-                    return Err(RuntimeError::VariableNotFound { name: name.0, line });
-                };
+                            let idx = *i as usize;
+                            if arr.borrow().len() == 0 || idx > arr.borrow().len() - 1 {
+                                Err(RuntimeError::IndexOutOfRange {
+                                    obj,
+                                    index: *i,
+                                    line,
+                                })
+                            } else {
+                                arr.borrow_mut()[idx] = val;
+                                Ok(Object::AbsoluteNil)
+                            }
+                        }
+                        _ => Err(RuntimeError::IndexOperatorNotSupported {
+                            obj: obj.scurry_type(),
+                            index_type: idx.scurry_type(),
+                            line,
+                        }),
+                    };
+                }
                 Ok(Object::AbsoluteNil)
             }
             Stmt::While(WhileStmt { condition, block }) => self.eval_while_stmt(condition, block),
