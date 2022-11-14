@@ -400,6 +400,7 @@ pub struct FunctionStmt {
     pub name: Ident,
     pub params: Vec<Ident>,
     pub block: Block,
+    pub visibility: Visibility,
 }
 
 impl fmt::Display for FunctionStmt {
@@ -409,13 +410,23 @@ impl fmt::Display for FunctionStmt {
             .iter()
             .map(|ident| ident.to_string() + ", ")
             .collect::<String>();
-        write!(
-            f,
-            "fn {}({}) {}",
-            self.name,
-            joined.strip_suffix(", ").unwrap_or(""),
-            self.block,
-        )
+        if self.visibility == Visibility::Public {
+            write!(
+                f,
+                "exp fn {}({}) {}",
+                self.name,
+                joined.strip_suffix(", ").unwrap_or(""),
+                self.block,
+            )
+        } else {
+            write!(
+                f,
+                "fn {}({}) {}",
+                self.name,
+                joined.strip_suffix(", ").unwrap_or(""),
+                self.block,
+            )
+        }
     }
 }
 
@@ -519,6 +530,12 @@ impl fmt::Display for Embed {
             .collect::<String>();
         write!(f, "[{}] {{ {assigned} }}", self.name)
     }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum Visibility {
+    Public,
+    Private,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -768,16 +785,19 @@ mod tests {
                 name: Ident("x".to_owned()),
                 params: vec![Ident("y".to_owned())],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+                visibility: Visibility::Private,
             },
             FunctionStmt {
                 name: Ident("x".to_owned()),
                 params: vec![Ident("y".to_owned()), Ident("z".to_owned())],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+                visibility: Visibility::Private,
             },
             FunctionStmt {
                 name: Ident("x".to_owned()),
                 params: Vec::new(),
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+                visibility: Visibility::Private,
             },
         ];
         let expecteds = ["fn x(y) { 3; }", "fn x(y, z) { 3; }", "fn x() { 3; }"];
@@ -828,6 +848,7 @@ mod tests {
                     name: Ident("testing".to_owned()),
                     params: Vec::new(),
                     block: Block(Vec::new()),
+                    visibility: Visibility::Private,
                 }],
                 embeds: Vec::new(),
             },

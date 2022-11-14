@@ -48,7 +48,7 @@ impl Interpreter {
         for stmt in program.0 {
             result = self.eval_stmt(stmt)?;
             // Get rid of return val wrappers, no longer needed
-            if let Object::ControlChange(ControlChange::Return(val)) = result {
+            while let Object::ControlChange(ControlChange::Return(val)) = result {
                 result = *val
             }
         }
@@ -155,6 +155,7 @@ impl Interpreter {
                 name,
                 params,
                 block,
+                ..
             }) => {
                 let func = Object::Function {
                     params,
@@ -195,25 +196,29 @@ impl Interpreter {
                     }
                     embedded
                 };
+                let mut exports = Vec::new();
+                let mut comp_methods = HashMap::new();
+                for func in methods {
+                    comp_methods.insert(
+                        func.name.0.clone(),
+                        Object::Function {
+                            params: func.params,
+                            body: func.block,
+                            env: Rc::clone(&self.env),
+                            bound: None,
+                        },
+                    );
+                    if func.visibility == Visibility::Public {
+                        exports.push(func.name.0)
+                    }
+                }
                 self.env.borrow_mut().set(
                     name.0.clone(),
                     Object::Component(Component {
                         name,
                         fields,
-                        methods: methods
-                            .into_iter()
-                            .map(|func| {
-                                (
-                                    func.name.0,
-                                    Object::Function {
-                                        params: func.params,
-                                        body: func.block,
-                                        env: Rc::clone(&self.env),
-                                        bound: None,
-                                    },
-                                )
-                            })
-                            .collect(),
+                        methods: comp_methods,
+                        exports,
                         embeds: embedded,
                     }),
                 );
@@ -727,9 +732,10 @@ impl Interpreter {
                 body,
                 env,
                 bound,
+                ..
             } => {
                 if let Some(obj) = bound {
-                    args.insert(0, Object::Instance((*obj).clone()));
+                    args.insert(0, Object::Instance((*obj).clone_with_private()));
                 }
                 if params.len() != args.len() {
                     return Err(RuntimeError::NotEnoughArgs {
@@ -763,11 +769,11 @@ impl Interpreter {
                             .collect(),
                     )),
                     embeds: Vec::new(),
+                    visibility: Visibility::Public,
                 };
                 if let Some(func) = Rc::clone(&rc_component).methods.get("$new") {
-                    let mut new_args = args.clone();
-                    new_args.insert(0, Object::Instance(instance.clone()));
-                    self.eval_call_expr(func.clone(), new_args, 1)?;
+                    args.insert(0, Object::Instance(instance.clone_with_private()));
+                    self.eval_call_expr(func.clone(), args, 1)?;
                 }
                 for (embed, assigned) in &Rc::clone(&rc_component).embeds {
                     let mut args = Vec::new();
@@ -806,24 +812,50 @@ impl Interpreter {
                 ref component,
                 ref field_values,
                 ref embeds,
+                ref visibility,
             }) => match field_values.borrow().get(&field) {
-                Some(value) => Ok(value.clone()),
-                None => match component.methods.get(&field) {
+                // Field is there and correct visibility
+                Some(value) if visibility == &Visibility::Private => Ok(value.clone()),
+                // Field is there, but visibility is wrong and there is no method with the same
+                // name
+                Some(_)
+                    if visibility == &Visibility::Public
+                        && component.methods.get(&field).is_none() =>
+                {
+                    Err(RuntimeError::UnrecognizedField {
+                        field,
+                        obj: left.scurry_type(),
+                        line,
+                    })
+                }
+                // Field is not there or any of the above cases were not activated
+                None | Some(_) => match component.methods.get(&field) {
                     Some(method) => {
                         if let Object::Function {
                             params, body, env, ..
                         } = method
                         {
-                            Ok(Object::Function {
-                                params: params.clone(),
-                                body: body.clone(),
-                                env: env.clone(),
-                                bound: Some(Rc::new(Instance {
-                                    component: component.clone(),
-                                    field_values: field_values.clone(),
-                                    embeds: embeds.clone(),
-                                })),
-                            })
+                            if visibility == &Visibility::Public
+                                && !component.exports.contains(&field)
+                            {
+                                Err(RuntimeError::UnrecognizedField {
+                                    field,
+                                    obj: left.scurry_type(),
+                                    line,
+                                })
+                            } else {
+                                Ok(Object::Function {
+                                    params: params.clone(),
+                                    body: body.clone(),
+                                    env: env.clone(),
+                                    bound: Some(Rc::new(Instance {
+                                        component: component.clone(),
+                                        field_values: field_values.clone(),
+                                        embeds: embeds.clone(),
+                                        visibility: visibility.clone(),
+                                    })),
+                                })
+                            }
                         } else {
                             unreachable!()
                         }
@@ -834,12 +866,19 @@ impl Interpreter {
                                 Some(Object::Function {
                                     params, body, env, ..
                                 }) => {
+                                    if !embed.component.exports.contains(&field) {
+                                        return Err(RuntimeError::UnrecognizedField {
+                                            field,
+                                            obj: left.scurry_type(),
+                                            line,
+                                        });
+                                    }
                                     return Ok(Object::Function {
                                         params: params.clone(),
                                         body: body.clone(),
                                         env: env.clone(),
                                         bound: Some(Rc::new(embed.clone())),
-                                    })
+                                    });
                                 }
                                 _ => unreachable!(),
                             }
@@ -1391,6 +1430,7 @@ mod tests {
                 fields: vec![Ident("field".to_owned())],
                 methods: HashMap::new(),
                 embeds: Vec::new(),
+                exports: Vec::new(),
             }),
             Object::Component(Component {
                 name: Ident("Test".to_owned()),
@@ -1409,6 +1449,7 @@ mod tests {
                     map
                 },
                 embeds: Vec::new(),
+                exports: Vec::new(),
             }),
         ];
 
@@ -1444,9 +1485,11 @@ mod tests {
                             map
                         },
                         embeds: Vec::new(),
+                        exports: Vec::new(),
                     },
                     Vec::new(),
                 )],
+                exports: Vec::new(),
             }),
             Object::Component(Component {
                 name: Ident("Test2".to_owned()),
@@ -1473,9 +1516,11 @@ mod tests {
                             map
                         },
                         embeds: Vec::new(),
+                        exports: Vec::new(),
                     },
                     vec![Ident("field".to_owned())],
                 )],
+                exports: Vec::new(),
             }),
         ];
 
@@ -1495,6 +1540,7 @@ mod tests {
                     fields: vec![Ident("field".to_owned())],
                     methods: HashMap::new(),
                     embeds: Vec::new(),
+                    exports: Vec::new(),
                 }),
                 field_values: Rc::new(RefCell::new({
                     let mut map = HashMap::new();
@@ -1502,6 +1548,7 @@ mod tests {
                     map
                 })),
                 embeds: Vec::new(),
+                visibility: Visibility::Public,
             }),
             Object::Instance(Instance {
                 component: Rc::new(Component {
@@ -1521,8 +1568,10 @@ mod tests {
                         map
                     },
                     embeds: Vec::new(),
+                    exports: Vec::new(),
                 }),
                 field_values: Rc::new(RefCell::new(HashMap::new())),
+                visibility: Visibility::Public,
                 embeds: Vec::new(),
             }),
         ];
@@ -1533,9 +1582,9 @@ mod tests {
     #[test]
     fn eval_methods_and_dot_expr() {
         let inputs = [
-            "decl Test { fn x(self, y) { return y; } }; Test().x(3);",
-            "decl Test { fn x(self) { return 3; } }; Test().x();",
-            "decl Test { field fn x(self) { return self.field; } }; Test().x();",
+            "decl Test { exp fn x(self, y) { return y; } }; Test().x(3);",
+            "decl Test { exp fn x(self) { return 3; } }; Test().x();",
+            "decl Test { field exp fn x(self) { return self.field; } }; Test().x();",
         ];
         let expecteds = [Object::Int(3), Object::Int(3), Object::Nil];
 
@@ -1544,8 +1593,17 @@ mod tests {
 
     #[test]
     fn eval_embedded_methods_in_component_instances() {
-        let inputs =
-            ["decl Test { fn x(self) { return 3; } }; decl Test2 { [Test] {} }; Test2().x();"];
+        let inputs = [
+            "decl Test { exp fn x(self) { return 3; } }; decl Test2 { [Test] {} }; Test2().x();",
+        ];
+        let expecteds = [Object::Int(3)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn private_methods_usable_in_component() {
+        let inputs = ["decl Test { exp fn x(self) { return self.y(); } fn y(self) { return 3; } }; Test().x();"];
         let expecteds = [Object::Int(3)];
 
         test_eval!(inputs, expecteds)
@@ -1606,7 +1664,7 @@ mod tests {
     #[test]
     fn field_assignment() {
         let inputs =
-            ["decl Test { field fn $new(self) { self.field = 5; } }; x = Test(); x.field;"];
+            ["decl Test { field fn $new(self) { self.field = 5; } exp fn field(self) { return self.field; } }; x = Test(); x.field();"];
         let expecteds = [Object::Int(5)];
 
         test_eval!(inputs, expecteds)

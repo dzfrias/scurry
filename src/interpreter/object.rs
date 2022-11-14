@@ -230,6 +230,7 @@ pub struct Component {
     pub fields: Vec<Ident>,
     pub methods: HashMap<String, Object>,
     pub embeds: Vec<(Component, Vec<Ident>)>,
+    pub exports: Vec<String>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -237,6 +238,15 @@ pub struct Instance {
     pub component: Rc<Component>,
     pub field_values: Rc<RefCell<HashMap<String, Object>>>,
     pub embeds: Vec<Instance>,
+    pub visibility: Visibility,
+}
+
+impl Instance {
+    pub fn clone_with_private(&self) -> Self {
+        let mut clone = self.clone();
+        clone.visibility = Visibility::Private;
+        clone
+    }
 }
 
 impl Clone for Instance {
@@ -245,6 +255,7 @@ impl Clone for Instance {
             component: Rc::clone(&self.component),
             field_values: Rc::clone(&self.field_values),
             embeds: self.embeds.clone(),
+            visibility: self.visibility.clone(),
         }
     }
 }

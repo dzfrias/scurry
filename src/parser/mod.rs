@@ -272,6 +272,7 @@ impl<'a> Parser<'a> {
             Token::Function if matches!(self.peek_token, Token::Ident(..)) => {
                 Stmt::Function(self.parse_function_stmt()?)
             }
+            Token::Export => Stmt::Function(self.parse_function_stmt()?),
             Token::Return => {
                 self.scopes_contain(ScopeType::Function)?;
                 Stmt::Return(self.parse_return_stmt()?)
@@ -632,6 +633,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function_stmt(&mut self) -> Option<FunctionStmt> {
+        let visibility = {
+            let mut visibility = Visibility::Private;
+            if self.current_token == Token::Export {
+                self.next_token();
+                visibility = Visibility::Public;
+            }
+            visibility
+        };
         let mut special = false;
         if self.peek_token == Token::Dollar {
             self.next_token();
@@ -657,6 +666,7 @@ impl<'a> Parser<'a> {
             name,
             params,
             block,
+            visibility,
         })
     }
 
@@ -695,7 +705,7 @@ impl<'a> Parser<'a> {
                         line: self.line,
                     })
                 }
-                Token::Function => {
+                Token::Function | Token::Export => {
                     self.scope_stack.push(ScopeType::Decl);
                     let function = self.parse_function_stmt()?;
                     self.scope_stack.pop().expect("should have scope on stack");
@@ -1589,16 +1599,19 @@ mod tests {
                 name: Ident("test".to_owned()),
                 params: vec![Ident("i".to_owned())],
                 block: Block(vec![Stmt::Expr(Expr::Ident(Ident("i".to_owned())))]),
+                visibility: Visibility::Private,
             }),
             Stmt::Function(FunctionStmt {
                 name: Ident("test2".to_owned()),
                 params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
+                visibility: Visibility::Private,
             }),
             Stmt::Function(FunctionStmt {
                 name: Ident("test".to_owned()),
                 params: Vec::new(),
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
+                visibility: Visibility::Private,
             }),
         ];
 
@@ -1614,6 +1627,7 @@ mod tests {
             block: Block(vec![Stmt::Return(ReturnStmt {
                 value: Expr::Literal(Literal::Integer(3)),
             })]),
+            visibility: Visibility::Private,
         })];
 
         test_parse!(inputs, expecteds)
@@ -1674,6 +1688,7 @@ mod tests {
                     name: Ident("xy".to_owned()),
                     params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
                     block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
+                    visibility: Visibility::Private,
                 }],
                 fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                 embeds: Vec::new(),
@@ -1684,6 +1699,7 @@ mod tests {
                     name: Ident("xy".to_owned()),
                     params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
                     block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
+                    visibility: Visibility::Private,
                 }],
                 fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                 embeds: vec![Embed {
@@ -1704,6 +1720,7 @@ mod tests {
                     name: Ident("xy".to_owned()),
                     params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
                     block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
+                    visibility: Visibility::Private,
                 }],
                 fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                 embeds: vec![Embed {
