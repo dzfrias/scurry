@@ -932,8 +932,6 @@ impl Default for Interpreter {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use super::*;
     use crate::parser::Parser;
 
