@@ -1981,4 +1981,48 @@ mod tests {
 
         runtime_error_eval!(inputs, errs)
     }
+
+    #[test]
+    fn eval_operator_assignment() {
+        let inputs = [
+            "x = 0; x += 1; x;",
+            "x = 0; x -= 1; x;",
+            "x = 2; x *= 2; x;",
+            "x = 2; x /= 2; x;",
+            "x = 20; x %= 2; x;",
+        ];
+        let expecteds = [
+            Object::Int(1),
+            Object::Int(-1),
+            Object::Int(4),
+            Object::Int(1),
+            Object::Int(0),
+        ];
+
+        test_eval!(inputs, expecteds);
+    }
+
+    #[test]
+    fn eval_operator_assignment_in_hashmap() {
+        let inputs = ["x = {\"hello\": 0}; x[\"hello\"] -= 1; x[\"hello\"];"];
+        let expecteds = [Object::Int(-1)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_operator_assignment_in_array() {
+        let inputs = ["x = [1, 2, 3]; x[0] *= 4; x[0];"];
+        let expecteds = [Object::Int(4)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_operator_assignment_in_struct_field() {
+        let inputs = ["decl Test { test fn $new(self) { self.test = 0; self.test += 1; } exp fn show(self) { return self.test; } }; x = Test(); x.show();"];
+        let expecteds = [Object::Int(1)];
+
+        test_eval!(inputs, expecteds)
+    }
 }
