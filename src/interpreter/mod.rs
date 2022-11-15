@@ -67,78 +67,68 @@ impl Interpreter {
 
     fn eval_stmt(&mut self, stmt: Stmt) -> EvalResult {
         match stmt {
-            Stmt::Assign(AssignStmt {
-                name,
-                value,
-                index,
-                field,
-                line,
-            }) => {
-                let val = self.eval_expr(value)?;
-                if index.is_none() && field.is_none() {
-                    self.env.borrow_mut().set(name.0, val);
-                    return Ok(Object::AbsoluteNil);
-                }
-                let Some(obj) = self.env.borrow().get(&name.0) else {
-                    return Err(RuntimeError::VariableNotFound { name: name.0, line });
-                };
-                if let Some(field_name) = field {
-                    let Object::Instance(instance) = obj else {
-                        return Err(RuntimeError::DotOperatorNotSupported {
-                            obj: obj.scurry_type(),
-                            line,
-                        });
-                    };
-                    if !instance.field_values.borrow().contains_key(&field_name.0) {
-                        return Err(RuntimeError::InvalidAssignedField {
-                            field: field_name.0,
-                            line,
-                        });
-                    }
-                    instance.field_values.borrow_mut().insert(field_name.0, val);
-                    return Ok(Object::AbsoluteNil);
-                }
-                if let Some(index) = index {
-                    let idx = self.eval_expr(index)?;
-                    return match (&obj, &idx) {
-                        (
-                            Object::Map(map),
-                            Object::Int(_) | Object::String(_) | Object::Bool(_),
-                        ) => {
-                            map.borrow_mut().insert(idx, val);
-                            Ok(Object::AbsoluteNil)
+            Stmt::Assign(AssignStmt { name, value, .. }) => {
+                let value = self.eval_expr(value)?;
+                match name {
+                    Expr::Ident(ident) => self.env.borrow_mut().set(ident.0, value),
+                    Expr::Dot(DotExpr { left, field, line }) => {
+                        let left = self.eval_expr(*left)?;
+                        let Object::Instance(instance) = left else {
+                            return Err(RuntimeError::DotOperatorNotSupported { obj: left.scurry_type(), line });
+                        };
+                        if !instance.field_values.borrow().contains_key(&field.0) {
+                            return Err(RuntimeError::InvalidAssignedField {
+                                field: field.0,
+                                line,
+                            });
                         }
-                        (Object::Array(arr), Object::Int(i)) => {
-                            if *i < 0 {
-                                if i.unsigned_abs() as usize > arr.borrow().len() {
+                        instance.field_values.borrow_mut().insert(field.0, value);
+                    }
+                    Expr::Index(IndexExpr { left, index, line }) => {
+                        let left = self.eval_expr(*left)?;
+                        let index = self.eval_expr(*index)?;
+                        match (&left, &index) {
+                            (
+                                Object::Map(map),
+                                Object::Int(_) | Object::String(_) | Object::Bool(_),
+                            ) => {
+                                map.borrow_mut().insert(index, value);
+                            }
+                            (Object::Array(arr), Object::Int(i)) => {
+                                if *i < 0 {
+                                    if i.unsigned_abs() as usize > arr.borrow().len() {
+                                        return Err(RuntimeError::IndexOutOfRange {
+                                            obj: left,
+                                            index: *i,
+                                            line,
+                                        });
+                                    }
+                                    let rev_idx = arr.borrow().len() - 1;
+                                    arr.borrow_mut()[rev_idx] = value;
+                                    return Ok(Object::AbsoluteNil);
+                                }
+                                let idx = *i as usize;
+                                if arr.borrow().len() == 0 || idx > arr.borrow().len() - 1 {
                                     return Err(RuntimeError::IndexOutOfRange {
-                                        obj,
+                                        obj: left,
                                         index: *i,
                                         line,
                                     });
+                                } else {
+                                    arr.borrow_mut()[idx] = value;
                                 }
-                                let rev_idx = arr.borrow().len() - 1;
-                                arr.borrow_mut()[rev_idx] = val;
-                                return Ok(Object::AbsoluteNil);
                             }
-                            let idx = *i as usize;
-                            if arr.borrow().len() == 0 || idx > arr.borrow().len() - 1 {
-                                Err(RuntimeError::IndexOutOfRange {
-                                    obj,
-                                    index: *i,
+                            _ => {
+                                return Err(RuntimeError::IndexOperatorNotSupported {
+                                    obj: left.scurry_type(),
+                                    index_type: index.scurry_type(),
                                     line,
-                                })
-                            } else {
-                                arr.borrow_mut()[idx] = val;
-                                Ok(Object::AbsoluteNil)
+                                });
                             }
                         }
-                        _ => Err(RuntimeError::IndexOperatorNotSupported {
-                            obj: obj.scurry_type(),
-                            index_type: idx.scurry_type(),
-                            line,
-                        }),
-                    };
+                    }
+                    // Cannot assign in this manner
+                    _ => todo!(),
                 }
                 Ok(Object::AbsoluteNil)
             }
@@ -1906,6 +1896,14 @@ mod tests {
     fn builtin_float_to_int() {
         let inputs = ["1.4.to_int();", "1.0.to_int();", "1.8.to_int();"];
         let expecteds = [Object::Int(1), Object::Int(1), Object::Int(1)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn assign_stmt_works_with_any_expression() {
+        let inputs = ["x = [1, 2, [1]]; x[2][0] = 3; x[2];"];
+        let expecteds = [Object::Array(Rc::new(RefCell::new(vec![Object::Int(3)])))];
 
         test_eval!(inputs, expecteds)
     }

@@ -312,10 +312,8 @@ impl fmt::Display for Stmt {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct AssignStmt {
-    pub name: Ident,
+    pub name: Expr,
     pub value: Expr,
-    pub field: Option<Ident>,
-    pub index: Option<Expr>,
     pub line: usize,
 }
 
@@ -680,10 +678,8 @@ mod tests {
     #[test]
     fn assign_stmt_display() {
         let inputs = [AssignStmt {
-            name: Ident("x".to_owned()),
+            name: Expr::Ident(Ident("x".to_owned())),
             value: Expr::Literal(Literal::Integer(3)),
-            field: None,
-            index: None,
             line: 1,
         }];
 

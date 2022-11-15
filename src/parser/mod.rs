@@ -251,9 +251,6 @@ impl<'a> Parser<'a> {
 
     fn parse_stmt(&mut self) -> Option<Stmt> {
         let stmt = match self.current_token {
-            Token::Ident(_) if self.peek_token == Token::Assign => {
-                Stmt::Assign(self.parse_assign_stmt()?)
-            }
             Token::Function if matches!(self.peek_token, Token::Ident(..)) => {
                 Stmt::Function(self.parse_function_stmt()?)
             }
@@ -275,41 +272,16 @@ impl<'a> Parser<'a> {
                 self.validate_current_scope(ScopeType::Loop)?;
                 Stmt::Continue
             }
-            Token::Ident(ref name) if self.peek_token == Token::Dot => {
-                let cloned_lex = self.lexer.clone();
-                let cloned_name = name.clone();
-                self.next_token();
-                self.next_token();
-                if self.peek_token == Token::Assign {
-                    Stmt::Assign(self.parse_dot_assign_stmt(Ident(cloned_name))?)
-                } else {
-                    // Put the lexer back into its old state
-                    self.current_token = Token::Ident(cloned_name);
-                    self.peek_token = Token::Dot;
-                    self.lexer = cloned_lex;
-                    Stmt::Expr(self.parse_expr_stmt()?)
-                }
-            }
-            Token::Ident(ref name) if self.peek_token == Token::Lbracket => {
-                let cloned_lex = self.lexer.clone();
-                let cloned_name = name.clone();
-                self.next_token();
-                self.next_token();
-                let index = self.parse_expr(Precedence::Lowest)?;
-                self.expect_peek(Token::Rbracket)?;
-                if self.peek_token == Token::Assign {
-                    Stmt::Assign(self.parse_index_assign_stmt(Ident(cloned_name), index)?)
-                } else {
-                    // Put the lexer back into its old state
-                    self.current_token = Token::Ident(cloned_name);
-                    self.peek_token = Token::Lbracket;
-                    self.lexer = cloned_lex;
-                    Stmt::Expr(self.parse_expr_stmt()?)
-                }
-            }
 
-            // Expression on one line
-            _ => Stmt::Expr(self.parse_expr_stmt()?),
+            _ => {
+                let expr = self.parse_expr(Precedence::Lowest)?;
+                if self.peek_token == Token::Assign {
+                    Stmt::Assign(self.parse_assign_stmt(expr)?)
+                } else {
+                    // Expression on one line
+                    Stmt::Expr(expr)
+                }
+            }
         };
         if self.current_token == Token::Rbrace && self.peek_token == Token::Semicolon {
             self.next_token();
@@ -317,11 +289,6 @@ impl<'a> Parser<'a> {
             self.expect_peek(Token::Semicolon);
         }
         Some(stmt)
-    }
-
-    fn parse_expr_stmt(&mut self) -> Option<Expr> {
-        let expr = self.parse_expr(Precedence::Lowest)?;
-        Some(expr)
     }
 
     fn parse_expr(&mut self, precedence: Precedence) -> Option<Expr> {
@@ -515,43 +482,13 @@ impl<'a> Parser<'a> {
         Some(ReturnStmt { value: return_val })
     }
 
-    fn parse_assign_stmt(&mut self) -> Option<AssignStmt> {
-        let ident = self.parse_ident()?;
+    fn parse_assign_stmt(&mut self, left: Expr) -> Option<AssignStmt> {
         self.expect_peek(Token::Assign)?;
         self.next_token();
         let value = self.parse_expr(Precedence::Lowest)?;
         Some(AssignStmt {
-            name: ident,
+            name: left,
             value,
-            field: None,
-            index: None,
-            line: self.line,
-        })
-    }
-
-    fn parse_dot_assign_stmt(&mut self, ident: Ident) -> Option<AssignStmt> {
-        let field = self.parse_ident()?;
-        self.expect_peek(Token::Assign)?;
-        self.next_token();
-        let value = self.parse_expr(Precedence::Lowest)?;
-        Some(AssignStmt {
-            name: ident,
-            value,
-            field: Some(field),
-            index: None,
-            line: self.line,
-        })
-    }
-
-    fn parse_index_assign_stmt(&mut self, ident: Ident, index: Expr) -> Option<AssignStmt> {
-        self.expect_peek(Token::Assign)?;
-        self.next_token();
-        let value = self.parse_expr(Precedence::Lowest)?;
-        Some(AssignStmt {
-            name: ident,
-            value,
-            field: None,
-            index: Some(index),
             line: self.line,
         })
     }
@@ -923,13 +860,11 @@ mod tests {
     }
 
     #[test]
-    fn parse_let_stmt() {
+    fn parse_assign_stmt() {
         let inputs = ["x = 3;"];
         let expecteds = [Stmt::Assign(AssignStmt {
-            name: Ident("x".to_owned()),
+            name: Expr::Ident(Ident("x".to_owned())),
             value: Expr::Literal(Literal::Integer(3)),
-            index: None,
-            field: None,
             line: 1,
         })];
 
@@ -941,10 +876,8 @@ mod tests {
         let inputs = ["x
             = 3;"];
         let expecteds = [Stmt::Assign(AssignStmt {
-            name: Ident("x".to_owned()),
+            name: Expr::Ident(Ident("x".to_owned())),
             value: Expr::Literal(Literal::Integer(3)),
-            index: None,
-            field: None,
             line: 2,
         })];
 
@@ -957,10 +890,8 @@ mod tests {
             x = 3;
             "];
         let expecteds = [Stmt::Assign(AssignStmt {
-            name: Ident("x".to_owned()),
+            name: Expr::Ident(Ident("x".to_owned())),
             value: Expr::Literal(Literal::Integer(3)),
-            field: None,
-            index: None,
             line: 2,
         })];
 
@@ -1867,10 +1798,12 @@ mod tests {
     fn parse_dot_assignment() {
         let inputs = ["hello.world = 3;"];
         let expecteds = [Stmt::Assign(AssignStmt {
-            name: Ident("hello".to_owned()),
+            name: Expr::Dot(DotExpr {
+                left: Box::new(Expr::Ident(Ident("hello".to_owned()))),
+                field: Ident("world".to_owned()),
+                line: 1,
+            }),
             value: Expr::Literal(Literal::Integer(3)),
-            field: Some(Ident("world".to_owned())),
-            index: None,
             line: 1,
         })];
 
@@ -1881,10 +1814,12 @@ mod tests {
     fn parse_index_assignment() {
         let inputs = ["test[1] = 3;"];
         let expecteds = [Stmt::Assign(AssignStmt {
-            name: Ident("test".to_owned()),
+            name: Expr::Index(IndexExpr {
+                left: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                index: Box::new(Expr::Literal(Literal::Integer(1))),
+                line: 1,
+            }),
             value: Expr::Literal(Literal::Integer(3)),
-            field: None,
-            index: Some(Expr::Literal(Literal::Integer(1))),
             line: 1,
         })];
 
