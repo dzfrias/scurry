@@ -216,8 +216,7 @@ impl<'a> Parser<'a> {
 
         Position {
             line: self.line,
-            range: self.column - self.current_len - self.whitespace_len
-                ..self.column - self.whitespace_len,
+            range: self.column..self.column,
         }
     }
 
