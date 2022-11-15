@@ -1,6 +1,6 @@
 # Scurry
-![Build status](https://github.com/dzfrias/scurry/actions/workflows/ci.yml/badge.svg)
-![Crates.io](https://img.shields.io/crates/v/scurry.svg)
+[![Build status](https://github.com/dzfrias/scurry/actions/workflows/ci.yml/badge.svg)](https://github.com/dzfrias/scurry/actions)
+[![Crates.io](https://img.shields.io/crates/v/scurry.svg)](https://crates.io/crates/scurry)
 
 Scurry is an dynamically typed component-based object-oriented language,
 written in [Rust](https://github.com/rust-lang/rust). Scurry is still under
@@ -121,6 +121,9 @@ println(str_nums.get_string());
 ```
 This language encourages small components with very little state that can be
 modified and small API surface areas.
+
+## Documentation
+More documentation is coming soon!
 
 ## Installation
 Currently, Scurry can be downloaded with the following methods.
