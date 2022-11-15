@@ -56,6 +56,17 @@ pub enum Token {
     #[token("||")]
     LogicalOr,
 
+    #[token("+=")]
+    PlusEq,
+    #[token("-=")]
+    MinusEq,
+    #[token("/=")]
+    SlashEq,
+    #[token("*=")]
+    StarEq,
+    #[token("%=")]
+    ModEq,
+
     #[token(",")]
     Comma,
     #[token(":")]
@@ -146,12 +157,17 @@ impl fmt::Display for Token {
             Token::Pipe => write!(f, "|"),
             Token::Lt => write!(f, "<"),
             Token::Dollar => write!(f, "$"),
-            Token::Export => write!(f, "EXPORT"),
+            Token::Export => write!(f, "exp"),
             Token::Gt => write!(f, ">"),
             Token::Eq => write!(f, "=="),
             Token::NotEq => write!(f, "!="),
             Token::Ge => write!(f, ">="),
             Token::Le => write!(f, "<="),
+            Token::PlusEq => write!(f, "+="),
+            Token::MinusEq => write!(f, "-="),
+            Token::SlashEq => write!(f, "/="),
+            Token::StarEq => write!(f, "*="),
+            Token::ModEq => write!(f, "%="),
             Token::LogicalAnd => write!(f, "&&"),
             Token::LogicalOr => write!(f, "||"),
             Token::Comma => write!(f, ","),

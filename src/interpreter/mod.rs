@@ -67,22 +67,52 @@ impl Interpreter {
 
     fn eval_stmt(&mut self, stmt: Stmt) -> EvalResult {
         match stmt {
-            Stmt::Assign(AssignStmt { name, value, .. }) => {
+            Stmt::Assign(AssignStmt {
+                name,
+                value,
+                line,
+                operator,
+            }) => {
                 let value = self.eval_expr(value)?;
                 match name {
-                    Expr::Ident(ident) => self.env.borrow_mut().set(ident.0, value),
+                    Expr::Ident(ident) => {
+                        if let Some(op) = operator {
+                            let prev_val = self.eval_ident(&ident.0)?;
+                            let result = self.eval_infix_expr(op.into(), prev_val, value, line)?;
+                            self.env.borrow_mut().set(ident.0, result);
+                        } else {
+                            self.env.borrow_mut().set(ident.0, value);
+                        }
+                    }
                     Expr::Dot(DotExpr { left, field, line }) => {
                         let left = self.eval_expr(*left)?;
                         let Object::Instance(instance) = left else {
                             return Err(RuntimeError::DotOperatorNotSupported { obj: left.scurry_type(), line });
                         };
+                        if instance.visibility != Visibility::Private {
+                            return Err(RuntimeError::UnrecognizedField {
+                                field: field.0,
+                                obj: Type::Instance(instance.component.name.0.clone()),
+                                line,
+                            });
+                        }
                         if !instance.field_values.borrow().contains_key(&field.0) {
                             return Err(RuntimeError::InvalidAssignedField {
                                 field: field.0,
                                 line,
                             });
                         }
-                        instance.field_values.borrow_mut().insert(field.0, value);
+                        if let Some(op) = operator {
+                            let prev_val = self.eval_dot_expr(
+                                Object::Instance(instance.clone()),
+                                field.0.clone(),
+                                line,
+                            )?;
+                            let result = self.eval_infix_expr(op.into(), prev_val, value, line)?;
+                            instance.field_values.borrow_mut().insert(field.0, result);
+                        } else {
+                            instance.field_values.borrow_mut().insert(field.0, value);
+                        }
                     }
                     Expr::Index(IndexExpr { left, index, line }) => {
                         let left = self.eval_expr(*left)?;
@@ -92,7 +122,18 @@ impl Interpreter {
                                 Object::Map(map),
                                 Object::Int(_) | Object::String(_) | Object::Bool(_),
                             ) => {
-                                map.borrow_mut().insert(index, value);
+                                if let Some(op) = operator {
+                                    let prev_val = self.eval_index_expr(
+                                        Object::Map(map.clone()),
+                                        index.clone(),
+                                        line,
+                                    )?;
+                                    let result =
+                                        self.eval_infix_expr(op.into(), prev_val, value, line)?;
+                                    map.borrow_mut().insert(index, result);
+                                } else {
+                                    map.borrow_mut().insert(index, value);
+                                }
                             }
                             (Object::Array(arr), Object::Int(i)) => {
                                 if *i < 0 {
@@ -104,7 +145,18 @@ impl Interpreter {
                                         });
                                     }
                                     let rev_idx = arr.borrow().len() - 1;
-                                    arr.borrow_mut()[rev_idx] = value;
+                                    if let Some(op) = operator {
+                                        let prev_val = self.eval_index_expr(
+                                            Object::Array(arr.clone()),
+                                            index.clone(),
+                                            line,
+                                        )?;
+                                        let result =
+                                            self.eval_infix_expr(op.into(), prev_val, value, line)?;
+                                        arr.borrow_mut()[rev_idx] = result;
+                                    } else {
+                                        arr.borrow_mut()[rev_idx] = value;
+                                    }
                                     return Ok(Object::AbsoluteNil);
                                 }
                                 let idx = *i as usize;
@@ -115,7 +167,18 @@ impl Interpreter {
                                         line,
                                     });
                                 } else {
-                                    arr.borrow_mut()[idx] = value;
+                                    if let Some(op) = operator {
+                                        let prev_val = self.eval_index_expr(
+                                            Object::Array(arr.clone()),
+                                            index.clone(),
+                                            line,
+                                        )?;
+                                        let result =
+                                            self.eval_infix_expr(op.into(), prev_val, value, line)?;
+                                        arr.borrow_mut()[idx] = result;
+                                    } else {
+                                        arr.borrow_mut()[idx] = value;
+                                    }
                                 }
                             }
                             _ => {
@@ -128,7 +191,7 @@ impl Interpreter {
                         }
                     }
                     // Cannot assign in this manner
-                    _ => todo!(),
+                    _ => return Err(RuntimeError::CannotAssign { expr: name, line }),
                 }
                 Ok(Object::AbsoluteNil)
             }
@@ -1906,5 +1969,16 @@ mod tests {
         let expecteds = [Object::Array(Rc::new(RefCell::new(vec![Object::Int(3)])))];
 
         test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn cannot_assign_to_wrong_expr_type() {
+        let inputs = ["1 = 3;"];
+        let errs = [RuntimeError::CannotAssign {
+            expr: Expr::Literal(Literal::Integer(1)),
+            line: 1,
+        }];
+
+        runtime_error_eval!(inputs, errs)
     }
 }

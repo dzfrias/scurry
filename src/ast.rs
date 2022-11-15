@@ -214,6 +214,18 @@ impl TryFrom<&Token> for InfixOp {
     }
 }
 
+impl From<AssignOp> for InfixOp {
+    fn from(value: AssignOp) -> Self {
+        match value {
+            AssignOp::Plus => InfixOp::Plus,
+            AssignOp::Minus => InfixOp::Minus,
+            AssignOp::Divide => InfixOp::Slash,
+            AssignOp::Multiply => InfixOp::Asterisk,
+            AssignOp::Modulo => InfixOp::Modulo,
+        }
+    }
+}
+
 impl fmt::Display for InfixOp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -314,6 +326,7 @@ impl fmt::Display for Stmt {
 pub struct AssignStmt {
     pub name: Expr,
     pub value: Expr,
+    pub operator: Option<AssignOp>,
     pub line: usize,
 }
 
@@ -321,6 +334,15 @@ impl fmt::Display for AssignStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{} = {};", self.name, self.value)
     }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum AssignOp {
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Modulo,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -681,6 +703,7 @@ mod tests {
             name: Expr::Ident(Ident("x".to_owned())),
             value: Expr::Literal(Literal::Integer(3)),
             line: 1,
+            operator: None,
         }];
 
         let expecteds = ["x = 3;"];

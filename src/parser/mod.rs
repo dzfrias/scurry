@@ -275,7 +275,15 @@ impl<'a> Parser<'a> {
 
             _ => {
                 let expr = self.parse_expr(Precedence::Lowest)?;
-                if self.peek_token == Token::Assign {
+                if matches!(
+                    self.peek_token,
+                    Token::Assign
+                        | Token::PlusEq
+                        | Token::MinusEq
+                        | Token::ModEq
+                        | Token::StarEq
+                        | Token::SlashEq
+                ) {
                     Stmt::Assign(self.parse_assign_stmt(expr)?)
                 } else {
                     // Expression on one line
@@ -483,12 +491,35 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_assign_stmt(&mut self, left: Expr) -> Option<AssignStmt> {
-        self.expect_peek(Token::Assign)?;
+        let op = match self.peek_token {
+            Token::Assign => None,
+            Token::PlusEq => Some(AssignOp::Plus),
+            Token::MinusEq => Some(AssignOp::Minus),
+            Token::SlashEq => Some(AssignOp::Divide),
+            Token::StarEq => Some(AssignOp::Multiply),
+            Token::ModEq => Some(AssignOp::Modulo),
+            _ => {
+                self.errors.push(ParserError::ExpectedAnyOf {
+                    pos: self.position(),
+                    tokens: vec![
+                        Token::Assign,
+                        Token::PlusEq,
+                        Token::MinusEq,
+                        Token::SlashEq,
+                        Token::StarEq,
+                        Token::ModEq,
+                    ],
+                });
+                None
+            }
+        };
+        self.next_token();
         self.next_token();
         let value = self.parse_expr(Precedence::Lowest)?;
         Some(AssignStmt {
             name: left,
             value,
+            operator: op,
             line: self.line,
         })
     }
@@ -866,6 +897,7 @@ mod tests {
             name: Expr::Ident(Ident("x".to_owned())),
             value: Expr::Literal(Literal::Integer(3)),
             line: 1,
+            operator: None,
         })];
 
         test_parse!(inputs, expecteds)
@@ -879,6 +911,7 @@ mod tests {
             name: Expr::Ident(Ident("x".to_owned())),
             value: Expr::Literal(Literal::Integer(3)),
             line: 2,
+            operator: None,
         })];
 
         test_parse!(inputs, expecteds)
@@ -893,6 +926,7 @@ mod tests {
             name: Expr::Ident(Ident("x".to_owned())),
             value: Expr::Literal(Literal::Integer(3)),
             line: 2,
+            operator: None,
         })];
 
         test_parse!(inputs, expecteds)
@@ -1805,6 +1839,7 @@ mod tests {
             }),
             value: Expr::Literal(Literal::Integer(3)),
             line: 1,
+            operator: None,
         })];
 
         test_parse!(inputs, expecteds)
@@ -1821,6 +1856,7 @@ mod tests {
             }),
             value: Expr::Literal(Literal::Integer(3)),
             line: 1,
+            operator: None,
         })];
 
         test_parse!(inputs, expecteds)
