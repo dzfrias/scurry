@@ -22,18 +22,31 @@ impl Position {
 
     pub fn format_on_source(&self, source: &str) -> String {
         let mut res = String::new();
-        let line = self.line;
+        let mut lineno = 0;
+        let column = {
+            let mut col = 0;
+            let mut current_col = 0;
+            for line in source.lines() {
+                current_col += line.len();
+                if self.range.start <= current_col {
+                    col = line.len() - (current_col - self.range.start);
+                    break;
+                }
+                current_col += 1;
+                lineno += 1;
+            }
+            col
+        };
         res.push_str(&format!(
-            "{}: {}",
-            line,
+            "{}: {}\n",
+            lineno + 1,
             source
                 .lines()
-                .nth(line - 1)
+                .nth(lineno)
                 .expect("Line should be in source")
         ));
-        res.push('\n');
-        res.push_str(&(" ".repeat(line.to_string().len()) + "  "));
-        res.push_str(&" ".repeat(self.range.start));
+        res.push_str(&(" ".repeat(self.line.to_string().len()) + "  "));
+        res.push_str(&" ".repeat(column));
         res.push_str(&"^".repeat(self.range.len()));
         res
     }
@@ -206,8 +219,8 @@ impl<'a> Parser<'a> {
         self.current_token = self.peek_token.clone();
         self.current_span = self.lexer.span();
         self.peek_token = self.lexer.next().unwrap_or(Token::EOF);
-        // Remove as many future newlines or whitespaces as possible
-        while self.peek_token == Token::Newline || self.peek_token == Token::HorizontalWhitespace {
+        // Remove as many future newlines as possible
+        while self.peek_token == Token::Newline {
             if self.peek_token == Token::Newline {
                 self.line += 1;
             }
@@ -903,7 +916,7 @@ mod tests {
         assert_eq!(
             Position {
                 line: 5,
-                range: 0..3,
+                range: 7..10,
             },
             parser.position()
         )
@@ -961,7 +974,7 @@ mod tests {
             token: Token::EOF,
             pos: Position {
                 line: 1,
-                range: 1..2,
+                range: 2..2,
             },
         }];
 

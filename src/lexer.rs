@@ -112,7 +112,7 @@ pub enum Token {
 
     #[regex(r"\n")]
     Newline,
-    #[regex(r"[ \t\f]+")]
+    #[regex(r"[ \t\f]+", logos::skip)]
     HorizontalWhitespace,
     #[regex(r"//.*", logos::skip)]
     Comment,
