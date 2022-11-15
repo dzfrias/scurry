@@ -1,5 +1,5 @@
 # Scurry
-![CI](https://github.com/dzfrias/scurry/actions/workflows/rust.yml/badge.svg)
+![Build status](https://github.com/dzfrias/scurry/actions/workflows/ci.yml/badge.svg)
 
 Scurry is an dynamically typed component-based object-oriented language,
 written in [Rust](https://github.com/rust-lang/rust). Scurry is still under
