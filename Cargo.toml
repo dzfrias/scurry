@@ -1,6 +1,15 @@
 [package]
 name = "scurry"
 version = "0.1.0"
+authors = ["Diego Frias <styx5242@gmail.com>"]
+license = "MIT"
+description = "A component-based object-oriented language"
+readme = "README.md"
+homepage = "https://github.com/dzfrias/scurry"
+repository = "https://github.com/dzfrias/scurry"
+keywords = ["cli", "language", "compiler"]
+categories = ["compilers"]
+rust-version = "1.65.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
