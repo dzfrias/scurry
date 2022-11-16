@@ -5,8 +5,11 @@ mod object;
 use self::env::Env;
 use self::object::*;
 use crate::ast::*;
+use crate::parser::Parser;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 macro_rules! loop_control {
@@ -166,19 +169,17 @@ impl Interpreter {
                                         index: *i,
                                         line,
                                     });
+                                } else if let Some(op) = operator {
+                                    let prev_val = self.eval_index_expr(
+                                        Object::Array(arr.clone()),
+                                        index.clone(),
+                                        line,
+                                    )?;
+                                    let result =
+                                        self.eval_infix_expr(op.into(), prev_val, value, line)?;
+                                    arr.borrow_mut()[idx] = result;
                                 } else {
-                                    if let Some(op) = operator {
-                                        let prev_val = self.eval_index_expr(
-                                            Object::Array(arr.clone()),
-                                            index.clone(),
-                                            line,
-                                        )?;
-                                        let result =
-                                            self.eval_infix_expr(op.into(), prev_val, value, line)?;
-                                        arr.borrow_mut()[idx] = result;
-                                    } else {
-                                        arr.borrow_mut()[idx] = value;
-                                    }
+                                    arr.borrow_mut()[idx] = value;
                                 }
                             }
                             _ => {
@@ -294,6 +295,11 @@ impl Interpreter {
                 let switch = self.eval_expr(expr)?;
                 self.eval_switch_stmt(switch, cases, default)
             }
+            Stmt::Import(ImportStmt {
+                target,
+                alias,
+                line,
+            }) => self.eval_import_stmt(target, alias, line),
             Stmt::Expr(expr) => self.eval_expr(expr),
         }
     }
@@ -1011,22 +1017,67 @@ impl Interpreter {
                 }),
             },
 
+            Object::Module { ref exports, .. } => {
+                exports
+                    .get(&field)
+                    .cloned()
+                    .ok_or(RuntimeError::UnrecognizedField {
+                        field,
+                        obj: left.scurry_type(),
+                        line,
+                    })
+            }
+
             _ => Err(RuntimeError::DotOperatorNotSupported {
                 obj: left.scurry_type(),
                 line,
             }),
         }
     }
-}
 
-impl Default for Interpreter {
-    fn default() -> Self {
-        Self::new()
+    fn eval_import_stmt(
+        &mut self,
+        target: String,
+        alias: Option<Ident>,
+        line: usize,
+    ) -> EvalResult {
+        let path = PathBuf::from(target);
+        // Check that no extension was given
+        if path.extension().is_some() {
+            return Err(RuntimeError::CouldNotReadFile { name: path, line });
+        }
+        let contents = fs::read_to_string(path.with_extension("scy")).map_err(|_| {
+            RuntimeError::CouldNotReadFile {
+                name: path.clone(),
+                line,
+            }
+        })?;
+        let parser = Parser::new(&contents);
+        let program = parser.parse().unwrap();
+        let mut module_interpreter = Interpreter::new();
+        module_interpreter.eval(program)?;
+        let name = {
+            if let Some(alias) = alias {
+                alias.0
+            } else {
+                path.display().to_string()
+            }
+        };
+        self.env.borrow_mut().set(
+            name,
+            Object::Module {
+                file: path,
+                exports: Rc::new(module_interpreter.env.borrow_mut().symbols()),
+            },
+        );
+        Ok(Object::AbsoluteNil)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, io::Write};
+
     use super::*;
     use crate::parser::Parser;
 
@@ -2024,5 +2075,58 @@ mod tests {
         let expecteds = [Object::Int(1)];
 
         test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_import_stmt() {
+        let mut file = File::create("test.scy").expect("should create file correctly");
+        file.write_all(b"fn test() { return 1; }")
+            .expect("should write bytes");
+
+        let inputs = ["import \"test\"; test.test();"];
+        let expecteds = [Object::Int(1)];
+
+        test_eval!(inputs, expecteds);
+
+        fs::remove_file("test.scy").expect("should remove file");
+    }
+
+    #[test]
+    fn eval_import_stmt_with_alias() {
+        let mut file = File::create("test.scy").expect("should create file correctly");
+        file.write_all(b"fn test() { return 1; }")
+            .expect("should write bytes");
+
+        let inputs = ["import \"test\" as testing; testing.test();"];
+        let expecteds = [Object::Int(1)];
+
+        test_eval!(inputs, expecteds);
+
+        fs::remove_file("test.scy").expect("should remove file");
+    }
+
+    #[test]
+    fn import_stmt_errors_with_invalid_file() {
+        let inputs = [
+            "import \"doesnotexist\";",
+            "import \"\";",
+            "import \"test.txt\";",
+        ];
+        let errs = [
+            RuntimeError::CouldNotReadFile {
+                name: PathBuf::from("doesnotexist"),
+                line: 1,
+            },
+            RuntimeError::CouldNotReadFile {
+                name: PathBuf::from(""),
+                line: 1,
+            },
+            RuntimeError::CouldNotReadFile {
+                name: PathBuf::from("test.txt"),
+                line: 1,
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
     }
 }

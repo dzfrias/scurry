@@ -1,4 +1,4 @@
-use super::object::Object;
+use super::object::*;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -35,6 +35,19 @@ impl Env {
 
     pub fn set(&mut self, name: String, val: Object) {
         self.env.insert(name, val);
+    }
+
+    pub fn symbols(&self) -> HashMap<String, Object> {
+        let mut symbols = HashMap::new();
+        for (name, object) in self.env.clone() {
+            // TODO: Public and private components and functions
+            match object {
+                Object::Function { .. } => drop(symbols.insert(name, object)),
+                Object::Component(_) => drop(symbols.insert(name, object)),
+                _ => {}
+            };
+        }
+        symbols
     }
 }
 

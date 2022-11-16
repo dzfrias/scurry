@@ -4,6 +4,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
+use std::path::PathBuf;
 use std::rc::Rc;
 use thiserror::Error;
 
@@ -44,6 +45,10 @@ pub enum Object {
     },
     Component(Component),
     Instance(Instance),
+    Module {
+        file: PathBuf,
+        exports: Rc<HashMap<String, Object>>,
+    },
     ControlChange(ControlChange),
     Nil,
     // Only used for statements, that return absolutely nothing
@@ -78,6 +83,10 @@ impl Clone for Object {
             Self::ControlChange(control) => Object::ControlChange(control.clone()),
             Self::Instance(instance) => Object::Instance(instance.clone()),
             Self::Component(component) => Object::Component(component.clone()),
+            Self::Module { file, exports } => Object::Module {
+                file: file.clone(),
+                exports: Rc::clone(exports),
+            },
             Self::Map(map) => Object::Map(Rc::clone(map)),
             Self::Array(arr) => Object::Array(Rc::clone(arr)),
         }
@@ -114,6 +123,7 @@ impl Object {
             Self::Map(_) => Type::Map,
             Self::Instance(Instance { component, .. }) => Type::Instance(component.name.0.clone()),
             Self::Component { .. } => Type::Component,
+            Self::Module { .. } => Type::Module,
             Self::Nil => Type::Nil,
             Self::AbsoluteNil => Type::Nil,
             Self::ControlChange(_) => Type::Nil,
@@ -131,6 +141,7 @@ impl Object {
             Self::Function { .. } => false,
             Self::Builtin(_) => false,
             Self::BuiltinMethod { .. } => false,
+            Self::Module { .. } => false,
             Self::ControlChange(_) => false,
             Self::Instance { .. } => false,
             Self::Component { .. } => false,
@@ -191,6 +202,7 @@ impl fmt::Display for Object {
                 let name = &component.name;
                 write!(f, "instance of type `{}`", name)
             }
+            Self::Module { file, .. } => write!(f, "module from file {}", file.display()),
             Self::Component(Component { name, .. }) => {
                 write!(f, "decl {name} {{ ... }}")
             }
@@ -214,6 +226,7 @@ pub enum Type {
     Instance(String),
     Component,
     Method,
+    Module,
 }
 
 impl fmt::Display for Type {
@@ -230,6 +243,7 @@ impl fmt::Display for Type {
             Self::Function => write!(f, "Function"),
             Self::Component => write!(f, "Component"),
             Self::Method => write!(f, "Method"),
+            Self::Module => write!(f, "Module"),
             Self::Instance(inst_type) => write!(f, "{}", inst_type),
         }
     }
@@ -366,6 +380,8 @@ pub enum RuntimeError {
     InvalidAssignedField { field: String, line: usize },
     #[error("cannot assign to expression `{expr}` on line {line}")]
     CannotAssign { expr: Expr, line: usize },
+    #[error("could not read file \"{name}\" on line {line}")]
+    CouldNotReadFile { name: PathBuf, line: usize },
 }
 
 pub type EvalResult = Result<Object, RuntimeError>;

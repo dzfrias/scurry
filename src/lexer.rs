@@ -117,6 +117,10 @@ pub enum Token {
     Declaration,
     #[token("exp")]
     Export,
+    #[token("import")]
+    Import,
+    #[token("as")]
+    As,
 
     // Not explicitly tokenized, used in parser
     EOF,
@@ -158,6 +162,8 @@ impl fmt::Display for Token {
             Token::Lt => write!(f, "<"),
             Token::Dollar => write!(f, "$"),
             Token::Export => write!(f, "exp"),
+            Token::Import => write!(f, "import"),
+            Token::As => write!(f, "as"),
             Token::Gt => write!(f, ">"),
             Token::Eq => write!(f, "=="),
             Token::NotEq => write!(f, "!="),
@@ -551,6 +557,18 @@ mod tests {
     fn tokenizes_export() {
         let mut lexer = Token::lexer("exp");
         assert_eq!(Token::Export, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_import() {
+        let mut lexer = Token::lexer("import");
+        assert_eq!(Token::Import, lexer.next().expect("Should lex something"));
+    }
+
+    #[test]
+    fn tokenizes_as() {
+        let mut lexer = Token::lexer("as");
+        assert_eq!(Token::As, lexer.next().expect("Should lex something"));
     }
 
     #[test]

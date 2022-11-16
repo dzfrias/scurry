@@ -273,6 +273,8 @@ impl<'a> Parser<'a> {
                 Stmt::Continue
             }
 
+            Token::Import => Stmt::Import(self.parse_import_stmt()?),
+
             _ => {
                 let expr = self.parse_expr(Precedence::Lowest)?;
                 if matches!(
@@ -801,6 +803,28 @@ impl<'a> Parser<'a> {
         self.expect_peek(Token::Rbrace)
             .expect("Should have an rbrace");
         Some(pairs)
+    }
+
+    fn parse_import_stmt(&mut self) -> Option<ImportStmt> {
+        self.next_token();
+        let Token::String(target) = self.current_token.clone() else {
+            self.errors.push(ParserError::ExpectedToken {
+                pos: self.position(),
+                token: Token::String("".to_owned()),
+            });
+            return None;
+        };
+        let mut alias = None;
+        if self.peek_token == Token::As {
+            self.next_token();
+            self.next_token();
+            alias = Some(self.parse_ident()?);
+        }
+        Some(ImportStmt {
+            alias,
+            target,
+            line: self.line,
+        })
     }
 }
 
@@ -1860,5 +1884,47 @@ mod tests {
         })];
 
         test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_import_statement() {
+        let inputs = ["import \"test\";", "import \"test\" as test2;"];
+        let expecteds = [
+            Stmt::Import(ImportStmt {
+                target: "test".to_owned(),
+                alias: None,
+                line: 1,
+            }),
+            Stmt::Import(ImportStmt {
+                target: "test".to_owned(),
+                alias: Some(Ident("test2".to_owned())),
+                line: 1,
+            }),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn have_to_import_string() {
+        let inputs = ["import 1;", "import 3.3;"];
+        let errs = [
+            ParserError::ExpectedToken {
+                pos: Position {
+                    line: 1,
+                    range: 7..8,
+                },
+                token: Token::String("".to_owned()),
+            },
+            ParserError::ExpectedToken {
+                pos: Position {
+                    line: 1,
+                    range: 7..10,
+                },
+                token: Token::String("".to_owned()),
+            },
+        ];
+
+        test_parse_errs!(inputs, errs)
     }
 }

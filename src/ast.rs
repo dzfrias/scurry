@@ -290,6 +290,8 @@ pub enum Stmt {
     Assign(AssignStmt),
     If(IfStmt),
 
+    Import(ImportStmt),
+
     Function(FunctionStmt),
     Return(ReturnStmt),
 
@@ -315,6 +317,7 @@ impl fmt::Display for Stmt {
             Self::Function(stmt) => write!(f, "{stmt}"),
             Self::Switch(stmt) => write!(f, "{stmt}"),
             Self::Declaration(stmt) => write!(f, "{stmt}"),
+            Self::Import(stmt) => write!(f, "{stmt}"),
             Self::Break => write!(f, "break;"),
             Self::Continue => write!(f, "continue;"),
             Self::Expr(expr) => write!(f, "{expr}"),
@@ -446,6 +449,23 @@ impl fmt::Display for FunctionStmt {
                 joined.strip_suffix(", ").unwrap_or(""),
                 self.block,
             )
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct ImportStmt {
+    pub target: String,
+    pub alias: Option<Ident>,
+    pub line: usize,
+}
+
+impl fmt::Display for ImportStmt {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(alias) = &self.alias {
+            write!(f, "import {} as {}", self.target, alias)
+        } else {
+            write!(f, "import {}", self.target)
         }
     }
 }
