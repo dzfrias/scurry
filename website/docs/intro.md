@@ -2,46 +2,66 @@
 sidebar_position: 1
 ---
 
-# Tutorial Intro
+# Overview
 
-Let's discover **Docusaurus in less than 5 minutes**.
+A quick overview of the Scurry language.
+
+## Installation
+
+Scurry can currently be installed in **two** ways. More installation methods might
+be supported in the future!
+
+### Cargo
+You need to have the Rust toolchain installed to use this method.
+```bash
+cargo install scurry
+```
+
+### Manual
+You need to have the Rust toolchain installed to use this method.
+```bash
+git clone https://github.com/dzfrias/scurry
+cd scurry
+cargo build --release
+```
 
 ## Getting Started
-
-Get started by **creating a new site**.
-
-Or **try Docusaurus immediately** with **[docusaurus.new](https://docusaurus.new)**.
-
-### What you'll need
-
-- [Node.js](https://nodejs.org/en/download/) version 16.14 or above:
-  - When installing Node.js, you are recommended to check all checkboxes related to dependencies.
-
-## Generate a new site
-
-Generate a new Docusaurus site using the **classic template**.
-
-The classic template will automatically be added to your project after you run the command:
-
-```bash
-npm init docusaurus@latest my-website classic
+Create a file named `hello_world.scy` to begin your journey! Enter in:
 ```
-
-You can type this command into Command Prompt, Powershell, Terminal, or any other integrated terminal of your code editor.
-
-The command also installs all necessary dependencies you need to run Docusaurus.
-
-## Start your site
-
-Run the development server:
-
-```bash
-cd my-website
-npm run start
+println("Hello, World!");
 ```
+Now run `scurry hello_world.scy` to see your message printed to the screen!
 
-The `cd` command changes the directory you're working with. In order to work with your newly created Docusaurus site, you'll need to navigate the terminal there.
+You can also start up the Scurry REPL, just enter `scurry` into your shell.
+```
+>> println("This is the REPL!");
+This is the REPL!
+Nil
+>>
+```
+The `println` function returns `Nil`. We can get into those details later.
 
-The `npm run start` command builds your website locally and serves it through a development server, ready for you to view at http://localhost:3000/.
+Scurry aims to have good compiler feedback. Mess around with the function call
+syntax and see what Scurry tells you!
 
-Open `docs/intro.md` (this page) and edit some lines: the site **reloads automatically** and displays your changes.
+## Documentation Layout
+The documentation is split up into three sections. The basics, builtin features,
+and a more nuanced look into components.
+
+### The Basics
+The basics include:
+- Syntax
+- Scurry's builtin types
+- Basic components
+- Best practices
+
+### Builtins
+The builtin features docs include:
+- A better look into Scurry's builtin types
+- All of Scurry's builtin functions
+
+### Components
+Finally, the components section explains:
+- All component syntax
+- Component state
+- Best practices with components
