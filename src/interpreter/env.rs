@@ -1,4 +1,5 @@
 use super::object::*;
+use crate::ast::Visibility;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -40,10 +41,17 @@ impl Env {
     pub fn symbols(&self) -> HashMap<String, Object> {
         let mut symbols = HashMap::new();
         for (name, object) in self.env.clone() {
-            // TODO: Public and private components and functions
             match object {
-                Object::Function { .. } => drop(symbols.insert(name, object)),
-                Object::Component(_) => drop(symbols.insert(name, object)),
+                Object::Function { ref visibility, .. } => {
+                    if visibility == &Some(Visibility::Public) {
+                        symbols.insert(name, object);
+                    }
+                }
+                Object::Component(Component { ref visibility, .. }) => {
+                    if visibility == &Visibility::Public {
+                        symbols.insert(name, object);
+                    }
+                }
                 _ => {}
             };
         }

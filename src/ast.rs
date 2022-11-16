@@ -525,6 +525,7 @@ pub struct DeclarationStmt {
     pub methods: Vec<FunctionStmt>,
     pub fields: Vec<Ident>,
     pub embeds: Vec<Embed>,
+    pub visibility: Visibility,
 }
 
 impl fmt::Display for DeclarationStmt {
@@ -873,12 +874,14 @@ mod tests {
                 methods: Vec::new(),
                 fields: Vec::new(),
                 embeds: Vec::new(),
+                visibility: Visibility::Private,
             },
             DeclarationStmt {
                 name: Ident("Test".to_owned()),
                 fields: vec![Ident("test".to_owned()), Ident("test".to_owned())],
                 methods: Vec::new(),
                 embeds: Vec::new(),
+                visibility: Visibility::Private,
             },
             DeclarationStmt {
                 name: Ident("Test".to_owned()),
@@ -890,6 +893,7 @@ mod tests {
                     visibility: Visibility::Private,
                 }],
                 embeds: Vec::new(),
+                visibility: Visibility::Private,
             },
         ];
         let expecteds = [

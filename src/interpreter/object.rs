@@ -37,6 +37,7 @@ pub enum Object {
         body: Block,
         env: Rc<RefCell<Env>>,
         bound: Option<Rc<Instance>>,
+        visibility: Option<Visibility>,
     },
     Builtin(BuiltinFunc),
     BuiltinMethod {
@@ -67,11 +68,13 @@ impl Clone for Object {
                 body,
                 env,
                 bound,
+                visibility,
             } => Object::Function {
                 params: params.clone(),
                 body: body.clone(),
                 env: Rc::clone(env),
                 bound: bound.clone(),
+                visibility: visibility.clone(),
             },
             Self::Builtin(builtin) => Self::Builtin(*builtin),
             Self::BuiltinMethod { bound, function } => Self::BuiltinMethod {
@@ -256,6 +259,7 @@ pub struct Component {
     pub methods: HashMap<String, Object>,
     pub embeds: Vec<(Component, Vec<Ident>)>,
     pub exports: Vec<String>,
+    pub visibility: Visibility,
 }
 
 #[derive(Debug, PartialEq)]

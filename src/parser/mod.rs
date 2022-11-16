@@ -254,7 +254,20 @@ impl<'a> Parser<'a> {
             Token::Function if matches!(self.peek_token, Token::Ident(..)) => {
                 Stmt::Function(self.parse_function_stmt()?)
             }
-            Token::Export => Stmt::Function(self.parse_function_stmt()?),
+            Token::Export if self.peek_token == Token::Declaration => {
+                Stmt::Declaration(self.parse_decl_stmt()?)
+            }
+            Token::Export if self.peek_token == Token::Function => {
+                Stmt::Function(self.parse_function_stmt()?)
+            }
+            Token::Export => {
+                self.next_token();
+                self.errors.push(ParserError::ExpectedAnyOf {
+                    pos: self.position(),
+                    tokens: vec![Token::Declaration, Token::Function],
+                });
+                return None;
+            }
             Token::Return => {
                 self.scopes_contain(ScopeType::Function)?;
                 Stmt::Return(self.parse_return_stmt()?)
@@ -626,6 +639,14 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_decl_stmt(&mut self) -> Option<DeclarationStmt> {
+        let visibility = {
+            if self.current_token == Token::Export {
+                self.next_token();
+                Visibility::Public
+            } else {
+                Visibility::Private
+            }
+        };
         self.next_token();
         let name = self.parse_ident()?;
 
@@ -673,6 +694,7 @@ impl<'a> Parser<'a> {
             methods,
             fields,
             embeds,
+            visibility,
         })
     }
 
@@ -1562,6 +1584,7 @@ mod tests {
             "fn test(i) { i; }",
             "fn test2(x, y) { 1; }",
             "fn test() { 3; }",
+            "exp fn test() {}",
         ];
         let expecteds = [
             Stmt::Function(FunctionStmt {
@@ -1581,6 +1604,12 @@ mod tests {
                 params: Vec::new(),
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
                 visibility: Visibility::Private,
+            }),
+            Stmt::Function(FunctionStmt {
+                name: Ident("test".to_owned()),
+                params: Vec::new(),
+                block: Block(Vec::new()),
+                visibility: Visibility::Public,
             }),
         ];
 
@@ -1643,6 +1672,7 @@ mod tests {
             "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] { field1 field2 } }",
             "decl Test {}",
             "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] {} }",
+            "exp decl Test {}",
         ];
         let expecteds = [
             Stmt::Declaration(DeclarationStmt {
@@ -1650,6 +1680,7 @@ mod tests {
                 methods: Vec::new(),
                 fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                 embeds: Vec::new(),
+                visibility: Visibility::Private,
             }),
             Stmt::Declaration(DeclarationStmt {
                 name: Ident("Test".to_owned()),
@@ -1661,6 +1692,7 @@ mod tests {
                 }],
                 fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                 embeds: Vec::new(),
+                visibility: Visibility::Private,
             }),
             Stmt::Declaration(DeclarationStmt {
                 name: Ident("Test".to_owned()),
@@ -1676,12 +1708,14 @@ mod tests {
                     assigned: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                     line: 1,
                 }],
+                visibility: Visibility::Private,
             }),
             Stmt::Declaration(DeclarationStmt {
                 name: Ident("Test".to_owned()),
                 methods: Vec::new(),
                 fields: Vec::new(),
                 embeds: Vec::new(),
+                visibility: Visibility::Private,
             }),
             Stmt::Declaration(DeclarationStmt {
                 name: Ident("Test".to_owned()),
@@ -1697,6 +1731,14 @@ mod tests {
                     assigned: Vec::new(),
                     line: 1,
                 }],
+                visibility: Visibility::Private,
+            }),
+            Stmt::Declaration(DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                methods: Vec::new(),
+                fields: Vec::new(),
+                embeds: Vec::new(),
+                visibility: Visibility::Public,
             }),
         ];
 
@@ -1922,6 +1964,29 @@ mod tests {
                     range: 7..10,
                 },
                 token: Token::String("".to_owned()),
+            },
+        ];
+
+        test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn exp_can_only_be_used_with_functions_and_decls() {
+        let inputs = ["exp 1 + 1;", "exp import;"];
+        let errs = [
+            ParserError::ExpectedAnyOf {
+                pos: Position {
+                    line: 1,
+                    range: 4..5,
+                },
+                tokens: vec![Token::Declaration, Token::Function],
+            },
+            ParserError::ExpectedAnyOf {
+                pos: Position {
+                    line: 1,
+                    range: 4..10,
+                },
+                tokens: vec![Token::Declaration, Token::Function],
             },
         ];
 

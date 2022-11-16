@@ -206,13 +206,14 @@ impl Interpreter {
                 name,
                 params,
                 block,
-                ..
+                visibility,
             }) => {
                 let func = Object::Function {
                     params,
                     body: block,
                     env: Rc::clone(&self.env),
                     bound: None,
+                    visibility: Some(visibility),
                 };
                 self.env.borrow_mut().set(name.0, func);
                 Ok(Object::AbsoluteNil)
@@ -222,6 +223,7 @@ impl Interpreter {
                 methods,
                 fields,
                 embeds,
+                visibility,
             }) => {
                 let embedded = {
                     let mut embedded = Vec::new();
@@ -257,6 +259,7 @@ impl Interpreter {
                             body: func.block,
                             env: Rc::clone(&self.env),
                             bound: None,
+                            visibility: None,
                         },
                     );
                     if func.visibility == Visibility::Public {
@@ -271,6 +274,7 @@ impl Interpreter {
                         methods: comp_methods,
                         exports,
                         embeds: embedded,
+                        visibility,
                     }),
                 );
                 Ok(Object::AbsoluteNil)
@@ -336,6 +340,7 @@ impl Interpreter {
                 body: block,
                 env: Rc::clone(&self.env),
                 bound: None,
+                visibility: None,
             }),
             Expr::Dot(DotExpr { left, field, line }) => {
                 let expr = self.eval_expr(*left)?;
@@ -919,6 +924,7 @@ impl Interpreter {
                                         embeds: embeds.clone(),
                                         visibility: visibility.clone(),
                                     })),
+                                    visibility: None,
                                 })
                             }
                         } else {
@@ -943,6 +949,7 @@ impl Interpreter {
                                         body: body.clone(),
                                         env: env.clone(),
                                         bound: Some(Rc::new(embed.clone())),
+                                        visibility: None,
                                     });
                                 }
                                 _ => unreachable!(),
@@ -1550,12 +1557,14 @@ mod tests {
                 body: Block(Vec::new()),
                 env: Rc::new(RefCell::new(Env::new())),
                 bound: None,
+                visibility: None,
             },
             Object::Function {
                 params: Vec::new(),
                 body: Block(Vec::new()),
                 env: Rc::new(RefCell::new(Env::new())),
                 bound: None,
+                visibility: None,
             },
         ];
 
@@ -1602,6 +1611,7 @@ mod tests {
                 methods: HashMap::new(),
                 embeds: Vec::new(),
                 exports: Vec::new(),
+                visibility: Visibility::Private,
             }),
             Object::Component(Component {
                 name: Ident("Test".to_owned()),
@@ -1615,12 +1625,14 @@ mod tests {
                             body: Block(Vec::new()),
                             env: Rc::new(RefCell::new(Env::new())),
                             bound: None,
+                            visibility: None,
                         },
                     );
                     map
                 },
                 embeds: Vec::new(),
                 exports: Vec::new(),
+                visibility: Visibility::Private,
             }),
         ];
 
@@ -1651,16 +1663,19 @@ mod tests {
                                     body: Block(Vec::new()),
                                     env: Rc::new(RefCell::new(Env::new())),
                                     bound: None,
+                                    visibility: None,
                                 },
                             );
                             map
                         },
                         embeds: Vec::new(),
                         exports: Vec::new(),
+                        visibility: Visibility::Private,
                     },
                     Vec::new(),
                 )],
                 exports: Vec::new(),
+                visibility: Visibility::Private,
             }),
             Object::Component(Component {
                 name: Ident("Test2".to_owned()),
@@ -1682,16 +1697,19 @@ mod tests {
                                     body: Block(Vec::new()),
                                     env: Rc::new(RefCell::new(Env::new())),
                                     bound: None,
+                                    visibility: None,
                                 },
                             );
                             map
                         },
                         embeds: Vec::new(),
                         exports: Vec::new(),
+                        visibility: Visibility::Private,
                     },
                     vec![Ident("field".to_owned())],
                 )],
                 exports: Vec::new(),
+                visibility: Visibility::Private,
             }),
         ];
 
@@ -1712,6 +1730,7 @@ mod tests {
                     methods: HashMap::new(),
                     embeds: Vec::new(),
                     exports: Vec::new(),
+                    visibility: Visibility::Private,
                 }),
                 field_values: Rc::new(RefCell::new({
                     let mut map = HashMap::new();
@@ -1734,12 +1753,14 @@ mod tests {
                                 body: Block(Vec::new()),
                                 env: Rc::new(RefCell::new(Env::new())),
                                 bound: None,
+                                visibility: None,
                             },
                         );
                         map
                     },
                     embeds: Vec::new(),
                     exports: Vec::new(),
+                    visibility: Visibility::Private,
                 }),
                 field_values: Rc::new(RefCell::new(HashMap::new())),
                 visibility: Visibility::Public,
@@ -2080,24 +2101,10 @@ mod tests {
     #[test]
     fn eval_import_stmt() {
         let mut file = File::create("test.scy").expect("should create file correctly");
-        file.write_all(b"fn test() { return 1; }")
+        file.write_all(b"exp fn test() { return 1; }")
             .expect("should write bytes");
 
         let inputs = ["import \"test\"; test.test();"];
-        let expecteds = [Object::Int(1)];
-
-        test_eval!(inputs, expecteds);
-
-        fs::remove_file("test.scy").expect("should remove file");
-    }
-
-    #[test]
-    fn eval_import_stmt_with_alias() {
-        let mut file = File::create("test.scy").expect("should create file correctly");
-        file.write_all(b"fn test() { return 1; }")
-            .expect("should write bytes");
-
-        let inputs = ["import \"test\" as testing; testing.test();"];
         let expecteds = [Object::Int(1)];
 
         test_eval!(inputs, expecteds);
