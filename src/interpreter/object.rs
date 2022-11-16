@@ -276,6 +276,41 @@ impl Instance {
         clone.visibility = Visibility::Private;
         clone
     }
+
+    pub fn has_special(&self, name: SpecialMethod) -> bool {
+        self.component.methods.contains_key(name.into())
+    }
+
+    pub fn get_special(&self, name: SpecialMethod) -> Option<&Object> {
+        self.component.methods.get(name.into())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SpecialMethod {
+    New,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Call,
+    Truthy,
+}
+
+impl From<SpecialMethod> for &str {
+    fn from(method: SpecialMethod) -> Self {
+        match method {
+            SpecialMethod::New => "$new",
+            SpecialMethod::Add => "$add",
+            SpecialMethod::Sub => "$sub",
+            SpecialMethod::Mul => "$mul",
+            SpecialMethod::Div => "$div",
+            SpecialMethod::Mod => "$mod",
+            SpecialMethod::Call => "$call",
+            SpecialMethod::Truthy => "$truthy",
+        }
+    }
 }
 
 impl Clone for Instance {

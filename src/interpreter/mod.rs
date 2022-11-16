@@ -432,7 +432,25 @@ impl Interpreter {
         }
     }
 
-    fn eval_infix_expr(&self, op: InfixOp, left: Object, right: Object, line: usize) -> EvalResult {
+    fn eval_infix_expr(
+        &mut self,
+        op: InfixOp,
+        left: Object,
+        right: Object,
+        line: usize,
+    ) -> EvalResult {
+        macro_rules! special_op {
+            ($instance:expr, $name:ident) => {
+                if let Some(add) = $instance.get_special(SpecialMethod::$name) {
+                    let mut args = Vec::new();
+                    args.push(Object::Instance($instance.clone_with_private()));
+                    args.push(right);
+                    self.eval_call_expr(add.clone(), args, line)
+                } else {
+                    unreachable!()
+                }
+            };
+        }
         match (&left, &right) {
             (Object::Int(x), Object::Int(y)) => self.eval_int_infix_expr(op, *x, *y, line),
             (Object::Float(x), Object::Float(y)) => self.eval_float_infix_expr(op, *x, *y, line),
@@ -447,6 +465,21 @@ impl Interpreter {
             }
             (Object::String(s1), Object::String(s2)) => {
                 self.eval_string_infix_expr(op, s1, s2, line)
+            }
+            (Object::Instance(instance), _) if instance.has_special(SpecialMethod::Add) => {
+                special_op!(instance, Add)
+            }
+            (Object::Instance(instance), _) if instance.has_special(SpecialMethod::Sub) => {
+                special_op!(instance, Sub)
+            }
+            (Object::Instance(instance), _) if instance.has_special(SpecialMethod::Div) => {
+                special_op!(instance, Div)
+            }
+            (Object::Instance(instance), _) if instance.has_special(SpecialMethod::Mul) => {
+                special_op!(instance, Mul)
+            }
+            (Object::Instance(instance), _) if instance.has_special(SpecialMethod::Mod) => {
+                special_op!(instance, Mod)
             }
             _ => match op {
                 InfixOp::Eq => Ok(Object::Bool(left == right)),
@@ -838,7 +871,7 @@ impl Interpreter {
                     embeds: Vec::new(),
                     visibility: Visibility::Public,
                 };
-                if let Some(func) = Rc::clone(&rc_component).methods.get("$new") {
+                if let Some(func) = instance.get_special(SpecialMethod::New) {
                     args.insert(0, Object::Instance(instance.clone_with_private()));
                     self.eval_call_expr(func.clone(), args, 1)?;
                 }
@@ -868,6 +901,14 @@ impl Interpreter {
             Object::BuiltinMethod { bound, function } => {
                 function(*bound, args, line).expect("bound type should match")
             }
+            Object::Instance(instance) if instance.has_special(SpecialMethod::Call) => {
+                if let Some(func) = instance.get_special(SpecialMethod::Call) {
+                    args.insert(0, Object::Instance(instance.clone_with_private()));
+                    self.eval_call_expr(func.clone(), args, line)
+                } else {
+                    unreachable!()
+                }
+            }
             // Not a function
             _ => Err(RuntimeError::NotCallable {
                 obj: func.scurry_type(),
@@ -877,6 +918,22 @@ impl Interpreter {
     }
 
     fn eval_dot_expr(&self, left: Object, field: String, line: usize) -> EvalResult {
+        macro_rules! builtin_methods {
+            ($t:ident, $func:ident) => {
+                match builtin::$func(&field) {
+                    Some(method) => Ok(Object::BuiltinMethod {
+                        bound: Box::new(left),
+                        function: method,
+                    }),
+                    None => Err(RuntimeError::UnrecognizedField {
+                        field,
+                        obj: Type::$t,
+                        line,
+                    }),
+                }
+            };
+        }
+
         match left {
             Object::Instance(Instance {
                 ref component,
@@ -964,66 +1021,6 @@ impl Interpreter {
                 },
             },
 
-            Object::Array(_) => match builtin::get_array_method(&field) {
-                Some(method) => Ok(Object::BuiltinMethod {
-                    bound: Box::new(left),
-                    function: method,
-                }),
-                None => Err(RuntimeError::UnrecognizedField {
-                    field,
-                    obj: Type::Array,
-                    line,
-                }),
-            },
-
-            Object::Map(_) => match builtin::get_map_method(&field) {
-                Some(method) => Ok(Object::BuiltinMethod {
-                    bound: Box::new(left),
-                    function: method,
-                }),
-                None => Err(RuntimeError::UnrecognizedField {
-                    field,
-                    obj: Type::Map,
-                    line,
-                }),
-            },
-
-            Object::String(_) => match builtin::get_string_method(&field) {
-                Some(method) => Ok(Object::BuiltinMethod {
-                    bound: Box::new(left),
-                    function: method,
-                }),
-                None => Err(RuntimeError::UnrecognizedField {
-                    field,
-                    obj: Type::String,
-                    line,
-                }),
-            },
-
-            Object::Int(_) => match builtin::get_int_method(&field) {
-                Some(method) => Ok(Object::BuiltinMethod {
-                    bound: Box::new(left),
-                    function: method,
-                }),
-                None => Err(RuntimeError::UnrecognizedField {
-                    field,
-                    obj: Type::Int,
-                    line,
-                }),
-            },
-
-            Object::Float(_) => match builtin::get_float_method(&field) {
-                Some(method) => Ok(Object::BuiltinMethod {
-                    bound: Box::new(left),
-                    function: method,
-                }),
-                None => Err(RuntimeError::UnrecognizedField {
-                    field,
-                    obj: Type::Float,
-                    line,
-                }),
-            },
-
             Object::Module { ref exports, .. } => {
                 exports
                     .get(&field)
@@ -1034,6 +1031,12 @@ impl Interpreter {
                         line,
                     })
             }
+
+            Object::Array(_) => builtin_methods!(Array, get_array_method),
+            Object::Map(_) => builtin_methods!(Map, get_map_method),
+            Object::String(_) => builtin_methods!(String, get_string_method),
+            Object::Int(_) => builtin_methods!(Int, get_int_method),
+            Object::Float(_) => builtin_methods!(Float, get_float_method),
 
             _ => Err(RuntimeError::DotOperatorNotSupported {
                 obj: left.scurry_type(),
@@ -1060,6 +1063,7 @@ impl Interpreter {
             }
         })?;
         let parser = Parser::new(&contents);
+        // FIX: Parser errors in imports
         let program = parser.parse().unwrap();
         let mut module_interpreter = Interpreter::new();
         module_interpreter.eval(program)?;
@@ -2133,6 +2137,64 @@ mod tests {
                 line: 1,
             },
         ];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn plus_op_overload() {
+        let inputs =
+            ["decl Test { fn $add(self, other) { return other + 1; } }; x = Test(); x + 1;"];
+        let expecteds = [Object::Int(2)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn minus_op_overload() {
+        let inputs =
+            ["decl Test { fn $sub(self, other) { return other + 1; } }; x = Test(); x - 1;"];
+        let expecteds = [Object::Int(2)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn mul_op_overload() {
+        let inputs =
+            ["decl Test { fn $mul(self, other) { return other + 1; } }; x = Test(); x * 1;"];
+        let expecteds = [Object::Int(2)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn div_op_overload() {
+        let inputs =
+            ["decl Test { fn $div(self, other) { return other + 1; } }; x = Test(); x / 1;"];
+        let expecteds = [Object::Int(2)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn mod_op_overload() {
+        let inputs =
+            ["decl Test { fn $mod(self, other) { return other + 1; } }; x = Test(); x % 1;"];
+        let expecteds = [Object::Int(2)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn non_operator_overloaded_components_throws_runtime_error() {
+        let inputs = ["decl Test {}; Test() + 1;"];
+        let errs = [RuntimeError::InvalidBinaryOperand {
+            op: InfixOp::Plus,
+            left: Type::Instance("Test".to_owned()),
+            right: Type::Int,
+            line: 1,
+        }];
 
         runtime_error_eval!(inputs, errs)
     }
