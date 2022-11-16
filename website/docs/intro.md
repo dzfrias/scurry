@@ -57,8 +57,8 @@ The basics include:
 
 ### Builtins
 The builtin features docs include:
-- A better look into Scurry's builtin types
 - All of Scurry's builtin functions
+- The Scurry standard library
 
 ### Components
 Finally, the components section explains:
