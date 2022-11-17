@@ -1,6 +1,7 @@
 use crate::ast::*;
 use crate::lexer::Token;
 use logos::{Lexer, Logos};
+use std::collections::HashSet;
 use std::fmt;
 use std::ops::Range;
 use thiserror::Error;
@@ -298,8 +299,21 @@ impl<'a> Parser<'a> {
                         | Token::ModEq
                         | Token::StarEq
                         | Token::SlashEq
+                        | Token::Colon
+                        | Token::Bang,
                 ) {
-                    Stmt::Assign(self.parse_assign_stmt(expr)?)
+                    let type_checked = if self.peek_token == Token::Bang {
+                        self.next_token();
+                        true
+                    } else {
+                        false
+                    };
+                    let var_type = if matches!(expr, Expr::Ident(Ident(_))) {
+                        self.parse_type_annotation(Token::Colon)?
+                    } else {
+                        TypeAnnotation::default()
+                    };
+                    Stmt::Assign(self.parse_assign_stmt(expr, var_type, type_checked)?)
                 } else {
                     // Expression on one line
                     Stmt::Expr(expr)
@@ -453,11 +467,16 @@ impl<'a> Parser<'a> {
     fn parse_function_expr(&mut self) -> Option<FunctionExpr> {
         self.expect_peek(Token::Lparen)?;
         let params = self.parse_function_params()?;
+        let return_type = self.parse_type_annotation(Token::Gt)?;
         self.expect_peek(Token::Lbrace)?;
         self.scope_stack.push(ScopeType::Function);
         let block = self.parse_block()?;
         self.scope_stack.pop().expect("Should have scope on stack");
-        Some(FunctionExpr { params, block })
+        Some(FunctionExpr {
+            params,
+            block,
+            return_type,
+        })
     }
 
     fn parse_block(&mut self) -> Option<Block> {
@@ -505,7 +524,12 @@ impl<'a> Parser<'a> {
         Some(ReturnStmt { value: return_val })
     }
 
-    fn parse_assign_stmt(&mut self, left: Expr) -> Option<AssignStmt> {
+    fn parse_assign_stmt(
+        &mut self,
+        left: Expr,
+        var_type: TypeAnnotation,
+        type_checked: bool,
+    ) -> Option<AssignStmt> {
         let op = match self.peek_token {
             Token::Assign => None,
             Token::PlusEq => Some(AssignOp::Plus),
@@ -536,6 +560,8 @@ impl<'a> Parser<'a> {
             value,
             operator: op,
             line: self.line,
+            var_type,
+            type_checked,
         })
     }
 
@@ -626,6 +652,7 @@ impl<'a> Parser<'a> {
         };
         self.expect_peek(Token::Lparen)?;
         let params = self.parse_function_params()?;
+        let return_type = self.parse_type_annotation(Token::Gt)?;
         self.expect_peek(Token::Lbrace)?;
         self.scope_stack.push(ScopeType::Function);
         let block = self.parse_block()?;
@@ -635,6 +662,7 @@ impl<'a> Parser<'a> {
             params,
             block,
             visibility,
+            return_type,
         })
     }
 
@@ -752,7 +780,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_function_params(&mut self) -> Option<Vec<Ident>> {
+    fn parse_function_params(&mut self) -> Option<Vec<(Ident, TypeAnnotation)>> {
         let mut idents = Vec::new();
         if self.peek_token == Token::Rparen {
             self.next_token();
@@ -760,13 +788,15 @@ impl<'a> Parser<'a> {
         }
         self.next_token();
         let ident = self.parse_ident()?;
-        idents.push(ident);
+        let type_annotation = self.parse_type_annotation(Token::Colon)?;
+        idents.push((ident, type_annotation));
 
         while self.peek_token == Token::Comma {
             self.next_token();
             self.next_token();
             let ident = self.parse_ident()?;
-            idents.push(ident);
+            let type_annotation = self.parse_type_annotation(Token::Colon)?;
+            idents.push((ident, type_annotation));
         }
 
         self.expect_peek(Token::Rparen);
@@ -776,10 +806,17 @@ impl<'a> Parser<'a> {
 
     fn parse_call_expr(&mut self, left_exp: Expr) -> Option<CallExpr> {
         let args = self.parse_expr_list(Token::Rparen)?;
+        let type_checked = if self.peek_token == Token::Bang {
+            self.next_token();
+            true
+        } else {
+            false
+        };
         Some(CallExpr {
             func: Box::new(left_exp),
             args,
             line: self.line,
+            type_checked,
         })
     }
 
@@ -852,6 +889,41 @@ impl<'a> Parser<'a> {
             target,
             line: self.line,
         })
+    }
+
+    fn parse_type_annotation(&mut self, indicator: Token) -> Option<TypeAnnotation> {
+        if self.peek_token != indicator {
+            return Some(TypeAnnotation::default());
+        }
+        self.expect_peek(indicator)
+            .expect("next token should be indicator");
+        self.next_token();
+        let mut annotations = HashSet::new();
+        if self.current_token == Token::Nil {
+            annotations.insert(AstType::Nil);
+        } else if self.current_token == Token::Caret {
+            self.next_token();
+            let ident = self.parse_ident()?;
+            annotations.insert(AstType::HasComponent(ident.0));
+        } else {
+            let ident = self.parse_ident()?;
+            annotations.insert(ident.into());
+        }
+        while self.peek_token == Token::Pipe {
+            self.next_token();
+            self.next_token();
+            if self.current_token == Token::Nil {
+                annotations.insert(AstType::Nil);
+            } else if self.current_token == Token::Caret {
+                self.next_token();
+                let ident = self.parse_ident()?;
+                annotations.insert(AstType::HasComponent(ident.0));
+            } else {
+                let ident = self.parse_ident()?;
+                annotations.insert(ident.into());
+            }
+        }
+        Some(TypeAnnotation(annotations))
     }
 }
 
@@ -949,6 +1021,8 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             line: 1,
             operator: None,
+            var_type: TypeAnnotation::default(),
+            type_checked: false,
         })];
 
         test_parse!(inputs, expecteds)
@@ -963,6 +1037,8 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             line: 2,
             operator: None,
+            var_type: TypeAnnotation::default(),
+            type_checked: false,
         })];
 
         test_parse!(inputs, expecteds)
@@ -978,6 +1054,8 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             line: 2,
             operator: None,
+            var_type: TypeAnnotation::default(),
+            type_checked: false,
         })];
 
         test_parse!(inputs, expecteds)
@@ -1566,17 +1644,22 @@ mod tests {
         let inputs = ["fn(x) { x; }", "fn(e, y) { e + y; }"];
         let expecteds = [
             Stmt::Expr(Expr::Function(FunctionExpr {
-                params: vec![Ident("x".to_owned())],
+                params: vec![(Ident("x".to_owned()), TypeAnnotation::default())],
                 block: Block(vec![Stmt::Expr(Expr::Ident(Ident("x".to_owned())))]),
+                return_type: TypeAnnotation::default(),
             })),
             Stmt::Expr(Expr::Function(FunctionExpr {
-                params: vec![Ident("e".to_owned()), Ident("y".to_owned())],
+                params: vec![
+                    (Ident("e".to_owned()), TypeAnnotation::default()),
+                    (Ident("y".to_owned()), TypeAnnotation::default()),
+                ],
                 block: Block(vec![Stmt::Expr(Expr::Infix(InfixExpr {
                     left: Box::new(Expr::Ident(Ident("e".to_owned()))),
                     op: InfixOp::Plus,
                     right: Box::new(Expr::Ident(Ident("y".to_owned()))),
                     line: 1,
                 }))]),
+                return_type: TypeAnnotation::default(),
             })),
         ];
 
@@ -1594,27 +1677,34 @@ mod tests {
         let expecteds = [
             Stmt::Function(FunctionStmt {
                 name: Ident("test".to_owned()),
-                params: vec![Ident("i".to_owned())],
+                params: vec![(Ident("i".to_owned()), TypeAnnotation::default())],
                 block: Block(vec![Stmt::Expr(Expr::Ident(Ident("i".to_owned())))]),
                 visibility: Visibility::Private,
+                return_type: TypeAnnotation::default(),
             }),
             Stmt::Function(FunctionStmt {
                 name: Ident("test2".to_owned()),
-                params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                params: vec![
+                    (Ident("x".to_owned()), TypeAnnotation::default()),
+                    (Ident("y".to_owned()), TypeAnnotation::default()),
+                ],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
                 visibility: Visibility::Private,
+                return_type: TypeAnnotation::default(),
             }),
             Stmt::Function(FunctionStmt {
                 name: Ident("test".to_owned()),
                 params: Vec::new(),
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
                 visibility: Visibility::Private,
+                return_type: TypeAnnotation::default(),
             }),
             Stmt::Function(FunctionStmt {
                 name: Ident("test".to_owned()),
                 params: Vec::new(),
                 block: Block(Vec::new()),
                 visibility: Visibility::Public,
+                return_type: TypeAnnotation::default(),
             }),
         ];
 
@@ -1631,6 +1721,7 @@ mod tests {
                 value: Expr::Literal(Literal::Integer(3)),
             })]),
             visibility: Visibility::Private,
+            return_type: TypeAnnotation::default(),
         })];
 
         test_parse!(inputs, expecteds)
@@ -1655,7 +1746,7 @@ mod tests {
     fn can_return_from_loop_in_function() {
         let inputs = ["fn(x) { for i in x { return i; } }"];
         let expecteds = [Stmt::Expr(Expr::Function(FunctionExpr {
-            params: vec![Ident("x".to_owned())],
+            params: vec![(Ident("x".to_owned()), TypeAnnotation::default())],
             block: Block(vec![Stmt::For(ForStmt {
                 iter_ident: Ident("i".to_owned()),
                 expr: Expr::Ident(Ident("x".to_owned())),
@@ -1664,6 +1755,7 @@ mod tests {
                 })]),
                 line: 1,
             })]),
+            return_type: TypeAnnotation::default(),
         }))];
 
         test_parse!(inputs, expecteds)
@@ -1691,9 +1783,13 @@ mod tests {
                 name: Ident("Test".to_owned()),
                 methods: vec![FunctionStmt {
                     name: Ident("xy".to_owned()),
-                    params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                    params: vec![
+                        (Ident("x".to_owned()), TypeAnnotation::default()),
+                        (Ident("y".to_owned()), TypeAnnotation::default()),
+                    ],
                     block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
                     visibility: Visibility::Private,
+                    return_type: TypeAnnotation::default(),
                 }],
                 fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                 embeds: Vec::new(),
@@ -1703,9 +1799,13 @@ mod tests {
                 name: Ident("Test".to_owned()),
                 methods: vec![FunctionStmt {
                     name: Ident("xy".to_owned()),
-                    params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                    params: vec![
+                        (Ident("x".to_owned()), TypeAnnotation::default()),
+                        (Ident("y".to_owned()), TypeAnnotation::default()),
+                    ],
                     block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
                     visibility: Visibility::Private,
+                    return_type: TypeAnnotation::default(),
                 }],
                 fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                 embeds: vec![Embed {
@@ -1729,9 +1829,13 @@ mod tests {
                 name: Ident("Test".to_owned()),
                 methods: vec![FunctionStmt {
                     name: Ident("xy".to_owned()),
-                    params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                    params: vec![
+                        (Ident("x".to_owned()), TypeAnnotation::default()),
+                        (Ident("y".to_owned()), TypeAnnotation::default()),
+                    ],
                     block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(1)))]),
                     visibility: Visibility::Private,
+                    return_type: TypeAnnotation::default(),
                 }],
                 fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                 embeds: vec![Embed {
@@ -1790,16 +1894,19 @@ mod tests {
                     Expr::Ident(Ident("y".to_owned())),
                 ],
                 line: 1,
+                type_checked: false,
             })),
             Stmt::Expr(Expr::Call(CallExpr {
                 func: Box::new(Expr::Ident(Ident("test".to_owned()))),
                 args: vec![Expr::Literal(Literal::Integer(3))],
                 line: 1,
+                type_checked: false,
             })),
             Stmt::Expr(Expr::Call(CallExpr {
                 func: Box::new(Expr::Ident(Ident("test".to_owned()))),
                 args: Vec::new(),
                 line: 1,
+                type_checked: false,
             })),
         ];
 
@@ -1940,6 +2047,8 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             line: 1,
             operator: None,
+            var_type: TypeAnnotation::default(),
+            type_checked: false,
         })];
 
         test_parse!(inputs, expecteds)
@@ -1957,6 +2066,8 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             line: 1,
             operator: None,
+            var_type: TypeAnnotation::default(),
+            type_checked: false,
         })];
 
         test_parse!(inputs, expecteds)
@@ -2025,5 +2136,183 @@ mod tests {
         ];
 
         test_parse_errs!(inputs, errs)
+    }
+
+    #[test]
+    fn type_annotations_in_function_params() {
+        let inputs = [
+            "fn x(y: String) {}",
+            "fn x(y: String | Int) {}",
+            "fn x(y: ^Component | Int) {}",
+        ];
+        let expecteds = [
+            Stmt::Function(FunctionStmt {
+                name: Ident("x".to_owned()),
+                params: vec![(
+                    Ident("y".to_owned()),
+                    TypeAnnotation::from_iter([AstType::String]),
+                )],
+                block: Block(Vec::new()),
+                visibility: Visibility::Private,
+                return_type: TypeAnnotation::from_iter([AstType::Any]),
+            }),
+            Stmt::Function(FunctionStmt {
+                name: Ident("x".to_owned()),
+                params: vec![(
+                    Ident("y".to_owned()),
+                    TypeAnnotation::from_iter([AstType::String, AstType::Int]),
+                )],
+                block: Block(Vec::new()),
+                visibility: Visibility::Private,
+                return_type: TypeAnnotation::from_iter([AstType::Any]),
+            }),
+            Stmt::Function(FunctionStmt {
+                name: Ident("x".to_owned()),
+                params: vec![(
+                    Ident("y".to_owned()),
+                    TypeAnnotation::from_iter([
+                        AstType::HasComponent("Component".to_owned()),
+                        AstType::Int,
+                    ]),
+                )],
+                block: Block(Vec::new()),
+                visibility: Visibility::Private,
+                return_type: TypeAnnotation::from_iter([AstType::Any]),
+            }),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_annotations_in_function_ret_type() {
+        let inputs = ["fn x() > Int {}", "fn x() > Nil {}"];
+        let expecteds = [
+            Stmt::Function(FunctionStmt {
+                name: Ident("x".to_owned()),
+                params: Vec::new(),
+                block: Block(Vec::new()),
+                visibility: Visibility::Private,
+                return_type: TypeAnnotation::from_iter([AstType::Int]),
+            }),
+            Stmt::Function(FunctionStmt {
+                name: Ident("x".to_owned()),
+                params: Vec::new(),
+                block: Block(Vec::new()),
+                visibility: Visibility::Private,
+                return_type: TypeAnnotation::from_iter([AstType::Nil]),
+            }),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_annotation_in_var_assignment() {
+        let inputs = [
+            "x: Int = 3;",
+            "x: ^Component | String = 55;",
+            "x: ^Component | String += 55;",
+        ];
+        let expecteds = [
+            Stmt::Assign(AssignStmt {
+                name: Expr::Ident(Ident("x".to_owned())),
+                value: Expr::Literal(Literal::Integer(3)),
+                operator: None,
+                line: 1,
+                var_type: TypeAnnotation::from_iter([AstType::Int]),
+                type_checked: false,
+            }),
+            Stmt::Assign(AssignStmt {
+                name: Expr::Ident(Ident("x".to_owned())),
+                value: Expr::Literal(Literal::Integer(55)),
+                operator: None,
+                line: 1,
+                var_type: TypeAnnotation::from_iter([
+                    AstType::String,
+                    AstType::HasComponent("Component".to_owned()),
+                ]),
+                type_checked: false,
+            }),
+            Stmt::Assign(AssignStmt {
+                name: Expr::Ident(Ident("x".to_owned())),
+                value: Expr::Literal(Literal::Integer(55)),
+                operator: Some(AssignOp::Plus),
+                line: 1,
+                var_type: TypeAnnotation::from_iter([
+                    AstType::String,
+                    AstType::HasComponent("Component".to_owned()),
+                ]),
+                type_checked: false,
+            }),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_annotations_in_function_expr_params() {
+        let inputs = ["fn(y: Int) {}"];
+        let expecteds = [Stmt::Expr(Expr::Function(FunctionExpr {
+            params: vec![(
+                Ident("y".to_owned()),
+                TypeAnnotation::from_iter([AstType::Int]),
+            )],
+            block: Block(Vec::new()),
+            return_type: TypeAnnotation::default(),
+        }))];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_annotations_in_function_expr_return_type() {
+        let inputs = ["fn() > Int {}"];
+        let expecteds = [Stmt::Expr(Expr::Function(FunctionExpr {
+            params: Vec::new(),
+            block: Block(Vec::new()),
+            return_type: TypeAnnotation::from_iter([AstType::Int]),
+        }))];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_checked_function_call() {
+        let inputs = ["test()!;", "println(1, 2)!;"];
+        let expecteds = [
+            Stmt::Expr(Expr::Call(CallExpr {
+                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                args: Vec::new(),
+                line: 1,
+                type_checked: true,
+            })),
+            Stmt::Expr(Expr::Call(CallExpr {
+                func: Box::new(Expr::Ident(Ident("println".to_owned()))),
+                args: vec![
+                    Expr::Literal(Literal::Integer(1)),
+                    Expr::Literal(Literal::Integer(2)),
+                ],
+                line: 1,
+                type_checked: true,
+            })),
+        ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_checked_variable_assignment() {
+        let inputs = ["x! = 3;"];
+        let expecteds = [Stmt::Assign(AssignStmt {
+            name: Expr::Ident(Ident("x".to_owned())),
+            value: Expr::Literal(Literal::Integer(3)),
+            operator: None,
+            line: 1,
+            var_type: TypeAnnotation::default(),
+            type_checked: true,
+        })];
+
+        test_parse!(inputs, expecteds)
     }
 }

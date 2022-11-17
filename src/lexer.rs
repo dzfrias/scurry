@@ -38,6 +38,8 @@ pub enum Token {
     Pipe,
     #[token("$")]
     Dollar,
+    #[token("^")]
+    Caret,
 
     #[token("<")]
     Lt,
@@ -161,6 +163,7 @@ impl fmt::Display for Token {
             Token::Pipe => write!(f, "|"),
             Token::Lt => write!(f, "<"),
             Token::Dollar => write!(f, "$"),
+            Token::Caret => write!(f, "^"),
             Token::Export => write!(f, "exp"),
             Token::Import => write!(f, "import"),
             Token::As => write!(f, "as"),

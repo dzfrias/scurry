@@ -1,5 +1,6 @@
 use crate::lexer::Token;
 use core::fmt;
+use std::collections::HashSet;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
@@ -70,8 +71,9 @@ impl fmt::Display for DotExpr {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionExpr {
-    pub params: Vec<Ident>,
+    pub params: Vec<(Ident, TypeAnnotation)>,
     pub block: Block,
+    pub return_type: TypeAnnotation,
 }
 
 impl fmt::Display for FunctionExpr {
@@ -82,7 +84,7 @@ impl fmt::Display for FunctionExpr {
         let joined = self
             .params
             .iter()
-            .map(|ident| ident.to_string() + ", ")
+            .map(|ident| ident.0.to_string() + ", ")
             .collect::<String>();
         write!(
             f,
@@ -100,6 +102,7 @@ pub struct CallExpr {
     pub func: Box<Expr>,
     pub args: Vec<Expr>,
     pub line: usize,
+    pub type_checked: bool,
 }
 
 impl fmt::Display for CallExpr {
@@ -331,6 +334,8 @@ pub struct AssignStmt {
     pub value: Expr,
     pub operator: Option<AssignOp>,
     pub line: usize,
+    pub var_type: TypeAnnotation,
+    pub type_checked: bool,
 }
 
 impl fmt::Display for AssignStmt {
@@ -421,9 +426,10 @@ impl fmt::Display for WhileStmt {
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionStmt {
     pub name: Ident,
-    pub params: Vec<Ident>,
+    pub params: Vec<(Ident, TypeAnnotation)>,
     pub block: Block,
     pub visibility: Visibility,
+    pub return_type: TypeAnnotation,
 }
 
 impl fmt::Display for FunctionStmt {
@@ -431,7 +437,7 @@ impl fmt::Display for FunctionStmt {
         let joined = self
             .params
             .iter()
-            .map(|ident| ident.to_string() + ", ")
+            .map(|ident| ident.0.to_string() + ", ")
             .collect::<String>();
         if self.visibility == Visibility::Public {
             write!(
@@ -519,6 +525,7 @@ impl fmt::Display for Case {
     }
 }
 
+// TODO: Type annotations
 #[derive(Debug, PartialEq, Clone)]
 pub struct DeclarationStmt {
     pub name: Ident,
@@ -601,6 +608,93 @@ impl fmt::Display for Block {
 }
 
 pub type Program = Block;
+
+#[derive(Debug, PartialEq, Clone, Hash, Eq)]
+pub enum AstType {
+    Int,
+    Float,
+    Bool,
+    String,
+    Map,
+    Array,
+    Function,
+    Any,
+    Nil,
+    ComponentDecl,
+    Module,
+    Component(String),
+    HasComponent(String),
+}
+
+impl fmt::Display for AstType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Int => write!(f, "Int"),
+            Self::Float => write!(f, "Float"),
+            Self::Bool => write!(f, "Bool"),
+            Self::String => write!(f, "String"),
+            Self::Map => write!(f, "Map"),
+            Self::Array => write!(f, "Array"),
+            Self::Function => write!(f, "Fn"),
+            Self::Any => write!(f, "Any"),
+            Self::Nil => write!(f, "Nil"),
+            Self::ComponentDecl => write!(f, "Decl"),
+            Self::Module => write!(f, "Mod"),
+            Self::Component(name) => write!(f, "{}", name),
+            Self::HasComponent(name) => write!(f, "^{}", name),
+        }
+    }
+}
+
+impl From<Ident> for AstType {
+    fn from(ident: Ident) -> Self {
+        match ident.0.as_ref() {
+            "Int" => Self::Int,
+            "Float" => Self::Float,
+            "Bool" => Self::Bool,
+            "String" => Self::String,
+            "Map" => Self::Map,
+            "Array" => Self::Array,
+            "Fn" => Self::Function,
+            "Any" => Self::Any,
+            "Mod" => Self::Module,
+            "Decl" => Self::ComponentDecl,
+            _ => Self::Component(ident.0),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct TypeAnnotation(pub HashSet<AstType>);
+
+impl fmt::Display for TypeAnnotation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let types = self
+            .0
+            .iter()
+            .map(|ty| ty.to_string() + " | ")
+            .collect::<String>();
+        write!(f, "{}", types.strip_suffix(" | ").unwrap_or_default())
+    }
+}
+
+impl FromIterator<AstType> for TypeAnnotation {
+    fn from_iter<T: IntoIterator<Item = AstType>>(iter: T) -> Self {
+        let mut hashset = HashSet::new();
+        for ty in iter {
+            hashset.insert(ty);
+        }
+        Self(hashset)
+    }
+}
+
+impl Default for TypeAnnotation {
+    fn default() -> Self {
+        let mut hashset = HashSet::new();
+        hashset.insert(AstType::Any);
+        Self(hashset)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -725,6 +819,8 @@ mod tests {
             value: Expr::Literal(Literal::Integer(3)),
             line: 1,
             operator: None,
+            var_type: TypeAnnotation::default(),
+            type_checked: false,
         }];
 
         let expecteds = ["x = 3;"];
@@ -823,21 +919,27 @@ mod tests {
         let inputs = [
             FunctionStmt {
                 name: Ident("x".to_owned()),
-                params: vec![Ident("y".to_owned())],
+                params: vec![(Ident("y".to_owned()), TypeAnnotation::default())],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
                 visibility: Visibility::Private,
+                return_type: TypeAnnotation::default(),
             },
             FunctionStmt {
                 name: Ident("x".to_owned()),
-                params: vec![Ident("y".to_owned()), Ident("z".to_owned())],
+                params: vec![
+                    (Ident("y".to_owned()), TypeAnnotation::default()),
+                    (Ident("z".to_owned()), TypeAnnotation::default()),
+                ],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
                 visibility: Visibility::Private,
+                return_type: TypeAnnotation::default(),
             },
             FunctionStmt {
                 name: Ident("x".to_owned()),
                 params: Vec::new(),
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Integer(3)))]),
                 visibility: Visibility::Private,
+                return_type: TypeAnnotation::default(),
             },
         ];
         let expecteds = ["fn x(y) { 3; }", "fn x(y, z) { 3; }", "fn x() { 3; }"];
@@ -849,16 +951,22 @@ mod tests {
     fn function_expr_display() {
         let inputs = [
             FunctionExpr {
-                params: vec![Ident("x".to_owned())],
+                params: vec![(Ident("x".to_owned()), TypeAnnotation::default())],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
+                return_type: TypeAnnotation::default(),
             },
             FunctionExpr {
-                params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                params: vec![
+                    (Ident("x".to_owned()), TypeAnnotation::default()),
+                    (Ident("y".to_owned()), TypeAnnotation::default()),
+                ],
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
+                return_type: TypeAnnotation::default(),
             },
             FunctionExpr {
                 params: Vec::new(),
                 block: Block(vec![Stmt::Expr(Expr::Literal(Literal::Boolean(true)))]),
+                return_type: TypeAnnotation::default(),
             },
         ];
         let expecteds = ["fn(x) { True; }", "fn(x, y) { True; }", "fn() { True; }"];
@@ -891,6 +999,7 @@ mod tests {
                     params: Vec::new(),
                     block: Block(Vec::new()),
                     visibility: Visibility::Private,
+                    return_type: TypeAnnotation::default(),
                 }],
                 embeds: Vec::new(),
                 visibility: Visibility::Private,
@@ -914,16 +1023,19 @@ mod tests {
                     Expr::Literal(Literal::Integer(4)),
                     Expr::Ident(Ident("testing".to_owned())),
                 ],
+                type_checked: false,
                 line: 1,
             },
             CallExpr {
                 func: Box::new(Expr::Ident(Ident("test".to_owned()))),
                 args: vec![Expr::Literal(Literal::Integer(4))],
+                type_checked: false,
                 line: 1,
             },
             CallExpr {
                 func: Box::new(Expr::Ident(Ident("test".to_owned()))),
                 args: Vec::new(),
+                type_checked: false,
                 line: 1,
             },
         ];

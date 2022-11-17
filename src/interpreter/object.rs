@@ -34,7 +34,7 @@ pub enum Object {
     Array(Rc<RefCell<Vec<Object>>>),
     Map(Rc<RefCell<HashMap<Object, Object>>>),
     Function {
-        params: Vec<Ident>,
+        params: Vec<(Ident, TypeAnnotation)>,
         body: Block,
         env: Rc<RefCell<Env>>,
         bound: Option<Rc<Instance>>,
@@ -157,6 +157,14 @@ impl Object {
     pub fn is_absnil(&self) -> bool {
         self == &Self::AbsoluteNil
     }
+
+    pub fn fits_type(&self, type_annotation: TypeAnnotation) -> bool {
+        let own_type: AstType = self.scurry_type().into();
+        type_annotation
+            .0
+            .iter()
+            .any(|ty| &own_type == ty || ty == &AstType::Any)
+    }
 }
 
 impl fmt::Display for Object {
@@ -192,7 +200,7 @@ impl fmt::Display for Object {
             Self::Function { params, .. } => {
                 let params = params
                     .iter()
-                    .map(|ident| ident.to_string() + ", ")
+                    .map(|(ident, _)| ident.to_string() + ", ")
                     .collect::<String>();
                 write!(
                     f,
@@ -231,6 +239,26 @@ pub enum Type {
     Component,
     Method,
     Module,
+}
+
+impl Into<AstType> for Type {
+    fn into(self) -> AstType {
+        match self {
+            Self::Int => AstType::Int,
+            Self::Float => AstType::Float,
+            Self::Bool => AstType::Bool,
+            Self::String => AstType::String,
+            Self::Nil => AstType::Nil,
+            Self::Array => AstType::Array,
+            Self::Map => AstType::Map,
+            Self::Function => AstType::Function,
+            Self::Builtin => AstType::Function,
+            Self::Method => AstType::Function,
+            Self::Module => AstType::Module,
+            Self::Component => AstType::ComponentDecl,
+            Self::Instance(component) => AstType::Component(component),
+        }
+    }
 }
 
 impl fmt::Display for Type {
@@ -424,6 +452,18 @@ pub enum RuntimeError {
     ParserErrors {
         contents: String,
         errs: Vec<ParserError>,
+    },
+    #[error("wrong argument type `{name}`, expected `{expected}`, got `{got}`")]
+    WrongArgType {
+        name: String,
+        expected: TypeAnnotation,
+        got: AstType,
+    },
+    #[error("mismatched assign type on `{name}`, expected `{expected}`, got `{got}`")]
+    MismatchedAssignType {
+        name: String,
+        expected: TypeAnnotation,
+        got: AstType,
     },
 }
 

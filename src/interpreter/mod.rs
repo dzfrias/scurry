@@ -75,6 +75,8 @@ impl Interpreter {
                 value,
                 line,
                 operator,
+                type_checked,
+                var_type,
             }) => {
                 let value = self.eval_expr(value)?;
                 match name {
@@ -82,8 +84,22 @@ impl Interpreter {
                         if let Some(op) = operator {
                             let prev_val = self.eval_ident(&ident.0)?;
                             let result = self.eval_infix_expr(op.into(), prev_val, value, line)?;
+                            if type_checked && !result.fits_type(var_type.clone()) {
+                                return Err(RuntimeError::MismatchedAssignType {
+                                    name: ident.0.clone(),
+                                    expected: var_type,
+                                    got: result.scurry_type().into(),
+                                });
+                            }
                             self.env.borrow_mut().set(ident.0, result);
                         } else {
+                            if type_checked && !value.fits_type(var_type.clone()) {
+                                return Err(RuntimeError::MismatchedAssignType {
+                                    name: ident.0.clone(),
+                                    expected: var_type,
+                                    got: value.scurry_type().into(),
+                                });
+                            }
                             self.env.borrow_mut().set(ident.0, value);
                         }
                     }
@@ -208,6 +224,7 @@ impl Interpreter {
                 params,
                 block,
                 visibility,
+                ..
             }) => {
                 let func = Object::Function {
                     params,
@@ -328,7 +345,7 @@ impl Interpreter {
                 let index = self.eval_expr(*index)?;
                 self.eval_index_expr(expr, index, line)
             }
-            Expr::Function(FunctionExpr { params, block }) => Ok(Object::Function {
+            Expr::Function(FunctionExpr { params, block, .. }) => Ok(Object::Function {
                 params,
                 body: block,
                 env: Rc::clone(&self.env),
@@ -339,7 +356,12 @@ impl Interpreter {
                 let expr = self.eval_expr(*left)?;
                 self.eval_dot_expr(expr, field.0, line)
             }
-            Expr::Call(CallExpr { func, args, line }) => {
+            Expr::Call(CallExpr {
+                func,
+                args,
+                line,
+                type_checked,
+            }) => {
                 let func = self.eval_expr(*func)?;
                 let args = {
                     let mut result = Vec::new();
@@ -348,7 +370,7 @@ impl Interpreter {
                     }
                     result
                 };
-                self.eval_call_expr(func, args, line)
+                self.eval_call_expr(func, args, type_checked, line)
             }
             Expr::Prefix(PrefixExpr { left, op, line }) => {
                 let left = self.eval_expr(*left)?;
@@ -438,7 +460,7 @@ impl Interpreter {
                     let mut args = Vec::new();
                     args.push(Object::Instance($instance.clone_with_private()));
                     args.push(right);
-                    self.eval_call_expr(add.clone(), args, line)
+                    self.eval_call_expr(add.clone(), args, false, line)
                 } else {
                     unreachable!()
                 }
@@ -814,7 +836,13 @@ impl Interpreter {
         }
     }
 
-    fn eval_call_expr(&mut self, func: Object, mut args: Vec<Object>, line: usize) -> EvalResult {
+    fn eval_call_expr(
+        &mut self,
+        func: Object,
+        mut args: Vec<Object>,
+        type_checked: bool,
+        line: usize,
+    ) -> EvalResult {
         match func {
             Object::Function {
                 params,
@@ -833,11 +861,22 @@ impl Interpreter {
                         line,
                     });
                 }
+                if type_checked {
+                    for (arg, (name, ty)) in args.iter().zip(&params) {
+                        if !arg.fits_type(ty.clone()) {
+                            return Err(RuntimeError::WrongArgType {
+                                name: name.0.clone(),
+                                expected: ty.clone(),
+                                got: arg.scurry_type().into(),
+                            });
+                        }
+                    }
+                }
                 let outer = Rc::clone(&self.env);
                 let func_env = {
                     let mut scope = Env::new_enclosed(Rc::clone(&env));
                     for (arg, param) in args.iter().zip(params) {
-                        scope.set(param.0, arg.clone());
+                        scope.set(param.0 .0, arg.clone());
                     }
                     scope
                 };
@@ -846,6 +885,8 @@ impl Interpreter {
                 self.env = outer;
                 if let Object::ControlChange(ControlChange::Return(val)) = result {
                     Ok(*val)
+                } else if result.is_absnil() {
+                    Ok(Object::Nil)
                 } else {
                     Ok(result)
                 }
@@ -866,7 +907,7 @@ impl Interpreter {
                 };
                 if let Some(func) = instance.get_special(SpecialMethod::New) {
                     args.insert(0, Object::Instance(instance.clone_with_private()));
-                    self.eval_call_expr(func.clone(), args, 1)?;
+                    self.eval_call_expr(func.clone(), args, type_checked, line)?;
                 }
                 for (embed, assigned) in &Rc::clone(&rc_component).embeds {
                     let mut args = Vec::new();
@@ -885,7 +926,7 @@ impl Interpreter {
                         }
                     }
                     let embed_instance =
-                        self.eval_call_expr(Object::Component(embed.clone()), args, 1)?;
+                        self.eval_call_expr(Object::Component(embed.clone()), args, false, line)?;
                     if let Object::Instance(inst) = embed_instance {
                         instance.embeds.push(inst);
                     } else {
@@ -901,7 +942,7 @@ impl Interpreter {
             Object::Instance(instance) if instance.has_special(SpecialMethod::Call) => {
                 if let Some(func) = instance.get_special(SpecialMethod::Call) {
                     args.insert(0, Object::Instance(instance.clone_with_private()));
-                    self.eval_call_expr(func.clone(), args, line)
+                    self.eval_call_expr(func.clone(), args, type_checked, line)
                 } else {
                     unreachable!()
                 }
@@ -1556,7 +1597,10 @@ mod tests {
         let inputs = ["fn(x, y) {}", "fn() {}"];
         let expecteds = [
             Object::Function {
-                params: vec![Ident("x".to_owned()), Ident("y".to_owned())],
+                params: vec![
+                    (Ident("x".to_owned()), TypeAnnotation::default()),
+                    (Ident("y".to_owned()), TypeAnnotation::default()),
+                ],
                 body: Block(Vec::new()),
                 env: Rc::new(RefCell::new(Env::new())),
                 bound: None,
@@ -1624,7 +1668,10 @@ mod tests {
                     map.insert(
                         "x".to_owned(),
                         Object::Function {
-                            params: vec![Ident("self".to_owned()), Ident("x".to_owned())],
+                            params: vec![
+                                (Ident("self".to_owned()), TypeAnnotation::default()),
+                                (Ident("x".to_owned()), TypeAnnotation::default()),
+                            ],
                             body: Block(Vec::new()),
                             env: Rc::new(RefCell::new(Env::new())),
                             bound: None,
@@ -1662,7 +1709,10 @@ mod tests {
                             map.insert(
                                 "x".to_owned(),
                                 Object::Function {
-                                    params: vec![Ident("self".to_owned()), Ident("y".to_owned())],
+                                    params: vec![
+                                        (Ident("self".to_owned()), TypeAnnotation::default()),
+                                        (Ident("y".to_owned()), TypeAnnotation::default()),
+                                    ],
                                     body: Block(Vec::new()),
                                     env: Rc::new(RefCell::new(Env::new())),
                                     bound: None,
@@ -1694,8 +1744,8 @@ mod tests {
                                 "$new".to_owned(),
                                 Object::Function {
                                     params: vec![
-                                        Ident("self".to_owned()),
-                                        Ident("param".to_owned()),
+                                        (Ident("self".to_owned()), TypeAnnotation::default()),
+                                        (Ident("param".to_owned()), TypeAnnotation::default()),
                                     ],
                                     body: Block(Vec::new()),
                                     env: Rc::new(RefCell::new(Env::new())),
@@ -1760,7 +1810,10 @@ mod tests {
                         map.insert(
                             "$new".to_owned(),
                             Object::Function {
-                                params: vec![Ident("self".to_owned()), Ident("x".to_owned())],
+                                params: vec![
+                                    (Ident("self".to_owned()), TypeAnnotation::default()),
+                                    (Ident("x".to_owned()), TypeAnnotation::default()),
+                                ],
                                 body: Block(Vec::new()),
                                 env: Rc::new(RefCell::new(Env::new())),
                                 bound: None,
@@ -2197,6 +2250,64 @@ mod tests {
             left: Type::Instance("Test".to_owned()),
             right: Type::Int,
             line: 1,
+        }];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn eval_type_checked_function_call() {
+        let inputs = ["fn x(y: Int) { return 1; }; x(1)!;"];
+        let expecteds = [Object::Int(1)];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_checked_function_call_with_mismatched_type_throws_error() {
+        let inputs = [
+            "fn x(y: Int) {}; x(3.3)!;",
+            "fn x(y: Int | Float) {}; x([1])!;",
+        ];
+        let errs = [
+            RuntimeError::WrongArgType {
+                name: "y".to_owned(),
+                expected: TypeAnnotation::from_iter([AstType::Int]),
+                got: AstType::Float,
+            },
+            RuntimeError::WrongArgType {
+                name: "y".to_owned(),
+                expected: TypeAnnotation::from_iter([AstType::Int, AstType::Float]),
+                got: AstType::Array,
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn type_checked_function_call_works_with_instances() {
+        let inputs = ["decl Test {}; fn x(y: Test) {}; x(Test())!;"];
+        let expecteds = [Object::Nil];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_checked_assignment() {
+        let inputs = ["x!: Int = 3;"];
+        let expecteds = [Object::AbsoluteNil];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_checked_assignment_with_mismatched_type_throws_error() {
+        let inputs = ["x!: Int = 3.3;"];
+        let errs = [RuntimeError::MismatchedAssignType {
+            name: "x".to_owned(),
+            expected: TypeAnnotation::from_iter([AstType::Int]),
+            got: AstType::Float,
         }];
 
         runtime_error_eval!(inputs, errs)
