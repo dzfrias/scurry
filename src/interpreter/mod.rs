@@ -883,7 +883,10 @@ impl Interpreter {
                 self.env = Rc::new(RefCell::new(func_env));
                 let result = self.eval_block(body)?;
                 self.env = outer;
-                if let Object::ControlChange(ControlChange::Return(val)) = result {
+                if let Object::ControlChange(ControlChange::Return(mut val)) = result {
+                    if let Object::Instance(ref mut instance) = *val {
+                        instance.visibility = Visibility::Public;
+                    }
                     Ok(*val)
                 } else if result.is_absnil() {
                     Ok(Object::Nil)
@@ -2308,6 +2311,18 @@ mod tests {
             name: "x".to_owned(),
             expected: TypeAnnotation::from_iter([AstType::Int]),
             got: AstType::Float,
+        }];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn cannot_return_public_access_from_method() {
+        let inputs = ["decl Test { field fn $new(self) { self.field = 3; } exp fn test(self) { return self; } }; Test().test().field;"];
+        let errs = [RuntimeError::UnrecognizedField {
+            field: "field".to_owned(),
+            obj: Type::Instance("Test".to_owned()),
+            line: 1,
         }];
 
         runtime_error_eval!(inputs, errs)
