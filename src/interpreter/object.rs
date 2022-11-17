@@ -1,5 +1,6 @@
 use super::env::Env;
 use crate::ast::*;
+use crate::parser::ParserError;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -421,6 +422,11 @@ pub enum RuntimeError {
     CannotAssign { expr: Expr, line: usize },
     #[error("could not read file \"{name}\" on line {line}")]
     CouldNotReadFile { name: PathBuf, line: usize },
+    #[error("ParserError")]
+    ParserErrors {
+        contents: String,
+        errs: Vec<ParserError>,
+    },
 }
 
 pub type EvalResult = Result<Object, RuntimeError>;

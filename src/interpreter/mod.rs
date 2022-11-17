@@ -1,6 +1,6 @@
 mod builtin;
 mod env;
-mod object;
+pub mod object;
 
 use self::env::Env;
 use self::object::*;
@@ -1063,8 +1063,10 @@ impl Interpreter {
             }
         })?;
         let parser = Parser::new(&contents);
-        // FIX: Parser errors in imports
-        let program = parser.parse().unwrap();
+        let program = parser.parse().map_err(|err| RuntimeError::ParserErrors {
+            contents,
+            errs: err,
+        })?;
         let mut module_interpreter = Interpreter::new();
         module_interpreter.eval(program)?;
         let name = {

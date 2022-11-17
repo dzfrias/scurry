@@ -2,6 +2,7 @@ use clap::Parser as ArgParser;
 use rustyline::error::ReadlineError;
 use rustyline::{Config, Editor};
 use scurry;
+use scurry::interpreter::object::RuntimeError;
 use scurry::interpreter::Interpreter;
 use scurry::parser::Parser;
 use std::fs;
@@ -39,6 +40,16 @@ fn eval_file(path: PathBuf) {
     match parser.parse() {
         Ok(program) => {
             if let Err(err) = interpreter.eval(program) {
+                if let RuntimeError::ParserErrors { contents, errs } = err {
+                    println!("\nparser errors:");
+                    for err in errs {
+                        let s = err.to_string();
+                        println!();
+                        println!("{}", err.position().format_on_source(&contents));
+                        println!("{s}");
+                    }
+                    return;
+                }
                 eprintln!("\nruntime error:");
                 eprintln!("{err}");
                 process::exit(1);
@@ -73,11 +84,24 @@ fn start_repl() {
                 match parser.parse() {
                     Ok(program) => match interpreter.eval_repl(program) {
                         Ok(obj) if !obj.is_absnil() => println!("{obj}"),
-                        Err(err) => println!("{err}"),
+                        Err(err) => {
+                            if let RuntimeError::ParserErrors { contents, errs } = err {
+                                println!("\nparser errors:");
+                                for err in errs {
+                                    let s = err.to_string();
+                                    println!();
+                                    println!("{}", err.position().format_on_source(&contents));
+                                    println!("{s}");
+                                }
+                                continue;
+                            }
+                            println!("\nruntime error:");
+                            println!("{err}");
+                        }
                         _ => {}
                     },
                     Err(errs) => {
-                        println!("parser errors:");
+                        println!("\nparser errors:");
                         for err in errs {
                             let s = err.to_string();
                             println!();
