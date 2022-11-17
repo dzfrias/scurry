@@ -416,8 +416,6 @@ pub enum RuntimeError {
     },
     #[error("invalid embed `{name}`, must refer to a component on line {line}")]
     InvalidEmbed { name: String, line: usize },
-    #[error("invalid assigned field `{field}` on line {line}")]
-    InvalidAssignedField { field: String, line: usize },
     #[error("cannot assign to expression `{expr}` on line {line}")]
     CannotAssign { expr: Expr, line: usize },
     #[error("could not read file \"{name}\" on line {line}")]

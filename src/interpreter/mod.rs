@@ -100,8 +100,9 @@ impl Interpreter {
                             });
                         }
                         if !instance.field_values.borrow().contains_key(&field.0) {
-                            return Err(RuntimeError::InvalidAssignedField {
+                            return Err(RuntimeError::UnrecognizedField {
                                 field: field.0,
+                                obj: Type::Instance(instance.component.name.0.clone()),
                                 line,
                             });
                         }
@@ -1843,18 +1844,6 @@ mod tests {
         }];
 
         runtime_error_eval!(inputs, errs);
-    }
-
-    #[test]
-    fn invalid_assigned_field() {
-        let inputs =
-            ["decl Test { fn $new(self, x) {} }; decl Test2 { [Test] { field } }; Test2();"];
-        let errs = [RuntimeError::InvalidAssignedField {
-            field: "field".to_owned(),
-            line: 1,
-        }];
-
-        runtime_error_eval!(inputs, errs)
     }
 
     #[test]
