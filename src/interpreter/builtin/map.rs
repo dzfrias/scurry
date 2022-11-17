@@ -36,3 +36,13 @@ pub fn values(bound: Object, args: Vec<Object>, line: usize) -> Option<EvalResul
         None
     }
 }
+
+pub fn remove(bound: Object, args: Vec<Object>, line: usize) -> Option<EvalResult> {
+    validate_args_len!(args, 1, line);
+    if let Object::Map(obj) = bound {
+        obj.borrow_mut().remove(&args[0]);
+        Some(Ok(Object::Nil))
+    } else {
+        None
+    }
+}

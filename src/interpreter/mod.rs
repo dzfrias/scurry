@@ -2035,6 +2035,14 @@ mod tests {
     }
 
     #[test]
+    fn builtin_map_remove() {
+        let inputs = ["x = {1: 3}; x.remove(1); x;"];
+        let expecteds = [Object::Map(Rc::new(RefCell::new(HashMap::new())))];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
     fn assign_stmt_works_with_any_expression() {
         let inputs = ["x = [1, 2, [1]]; x[2][0] = 3; x[2];"];
         let expecteds = [Object::Array(Rc::new(RefCell::new(vec![Object::Int(3)])))];

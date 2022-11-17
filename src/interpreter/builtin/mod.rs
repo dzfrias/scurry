@@ -28,6 +28,7 @@ pub fn get_map_method(name: &str) -> Option<BuiltinMethod> {
     match name {
         "keys" => Some(map::keys),
         "values" => Some(map::values),
+        "remove" => Some(map::remove),
         _ => None,
     }
 }
