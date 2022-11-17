@@ -685,7 +685,17 @@ impl<'a> Parser<'a> {
         let mut embeds = Vec::new();
         while self.current_token != Token::Rbrace {
             match &self.current_token {
-                Token::Ident(ident) => fields.push(Ident(ident.to_owned())),
+                Token::Ident(ident) => {
+                    fields.push(Ident(ident.to_owned()));
+                    if !matches!(
+                        self.peek_token,
+                        Token::Lbracket | Token::Rbrace | Token::Export | Token::Function
+                    ) {
+                        self.expect_peek(Token::Comma)?;
+                    } else if self.peek_token == Token::Comma {
+                        self.next_token();
+                    }
+                }
                 Token::Lbracket => {
                     self.next_token();
                     let embed_name = self.parse_ident()?;
@@ -1764,11 +1774,11 @@ mod tests {
     #[test]
     fn parse_decl_stmt() {
         let inputs = [
-            "decl Test { field1 field2 }",
-            "decl Test { field1 field2 fn xy(x, y) { 1; } }",
-            "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] { field1, field2 } }",
+            "decl Test { field1, field2 }",
+            "decl Test { field1, field2 fn xy(x, y) { 1; } }",
+            "decl Test { field1, field2 fn xy(x, y) { 1; } [Testing] { field1, field2 } }",
             "decl Test {}",
-            "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] {} }",
+            "decl Test { field1, field2 fn xy(x, y) { 1; } [Testing] {} }",
             "exp decl Test {}",
         ];
         let expecteds = [
