@@ -552,10 +552,10 @@ impl fmt::Display for DeclarationStmt {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Embed {
     pub name: Ident,
-    pub assigned: Vec<Ident>,
+    pub assigned: Vec<Expr>,
     pub line: usize,
 }
 

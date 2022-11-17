@@ -663,13 +663,18 @@ impl<'a> Parser<'a> {
                     let embed_name = self.parse_ident()?;
                     self.expect_peek(Token::Rbracket)?;
                     self.expect_peek(Token::Lbrace)?;
+                    self.next_token();
                     let mut assigned = Vec::new();
-                    while self.peek_token != Token::Rbrace {
-                        self.next_token();
-                        assigned.push(self.parse_ident()?);
+                    if self.current_token != Token::Rbrace {
+                        assigned.push(self.parse_expr(Precedence::Lowest)?);
+                        while self.peek_token == Token::Comma {
+                            self.next_token();
+                            self.next_token();
+                            let field = self.parse_expr(Precedence::Lowest)?;
+                            assigned.push(field);
+                        }
+                        self.expect_peek(Token::Rbrace)?;
                     }
-                    self.expect_peek(Token::Rbrace)
-                        .expect("should end on rbrace");
                     embeds.push(Embed {
                         name: embed_name,
                         assigned,
@@ -1669,7 +1674,7 @@ mod tests {
         let inputs = [
             "decl Test { field1 field2 }",
             "decl Test { field1 field2 fn xy(x, y) { 1; } }",
-            "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] { field1 field2 } }",
+            "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] { field1, field2 } }",
             "decl Test {}",
             "decl Test { field1 field2 fn xy(x, y) { 1; } [Testing] {} }",
             "exp decl Test {}",
@@ -1705,7 +1710,10 @@ mod tests {
                 fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
                 embeds: vec![Embed {
                     name: Ident("Testing".to_owned()),
-                    assigned: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                    assigned: vec![
+                        Expr::Ident(Ident("field1".to_owned())),
+                        Expr::Ident(Ident("field2".to_owned())),
+                    ],
                     line: 1,
                 }],
                 visibility: Visibility::Private,
@@ -1741,6 +1749,32 @@ mod tests {
                 visibility: Visibility::Public,
             }),
         ];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn assigned_fields_can_be_exprs() {
+        let inputs = ["decl Test { [Component] { 1 + 1, \"hello\" } }"];
+        let expecteds = [Stmt::Declaration(DeclarationStmt {
+            name: Ident("Test".to_owned()),
+            methods: Vec::new(),
+            fields: Vec::new(),
+            embeds: vec![Embed {
+                name: Ident("Component".to_owned()),
+                assigned: vec![
+                    Expr::Infix(InfixExpr {
+                        left: Box::new(Expr::Literal(Literal::Integer(1))),
+                        op: InfixOp::Plus,
+                        right: Box::new(Expr::Literal(Literal::Integer(1))),
+                        line: 1,
+                    }),
+                    Expr::Literal(Literal::String("hello".to_owned())),
+                ],
+                line: 1,
+            }],
+            visibility: Visibility::Private,
+        })];
 
         test_parse!(inputs, expecteds)
     }

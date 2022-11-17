@@ -237,14 +237,6 @@ impl Interpreter {
                                 });
                             }
                         };
-                        for assigned in &embed.assigned {
-                            if !fields.contains(assigned) {
-                                return Err(RuntimeError::InvalidAssignedField {
-                                    field: assigned.0.clone(),
-                                    line: embed.line,
-                                });
-                            }
-                        }
                         embedded.push((embed_component, embed.assigned));
                     }
                     embedded
@@ -877,15 +869,19 @@ impl Interpreter {
                 }
                 for (embed, assigned) in &Rc::clone(&rc_component).embeds {
                     let mut args = Vec::new();
-                    for field in assigned {
-                        args.push(
-                            instance
-                                .field_values
-                                .borrow()
-                                .get(&field.0)
-                                .expect("all assigned fields should be in field list")
-                                .clone(),
-                        )
+                    for expr in assigned {
+                        if let Expr::Ident(field) = expr {
+                            let arg = if let Some(field_val) =
+                                instance.field_values.borrow().get(&field.0)
+                            {
+                                field_val.clone()
+                            } else {
+                                self.eval_expr(expr.clone())?
+                            };
+                            args.push(arg)
+                        } else {
+                            args.push(self.eval_expr(expr.clone())?)
+                        }
                     }
                     let embed_instance =
                         self.eval_call_expr(Object::Component(embed.clone()), args, 1)?;
@@ -1712,12 +1708,20 @@ mod tests {
                         exports: Vec::new(),
                         visibility: Visibility::Private,
                     },
-                    vec![Ident("field".to_owned())],
+                    vec![Expr::Ident(Ident("field".to_owned()))],
                 )],
                 exports: Vec::new(),
                 visibility: Visibility::Private,
             }),
         ];
+
+        test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn eval_exprs_in_assigned_fields() {
+        let inputs = ["decl Test { field fn $new(self, field) { self.field = field; } exp fn test(self) { return self.field; } }; decl Test2 { [Test] { 1 + 1 } }; Test2().test();"];
+        let expecteds = [Object::Int(2)];
 
         test_eval!(inputs, expecteds)
     }
