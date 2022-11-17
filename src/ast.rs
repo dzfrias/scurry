@@ -525,12 +525,11 @@ impl fmt::Display for Case {
     }
 }
 
-// TODO: Type annotations
 #[derive(Debug, PartialEq, Clone)]
 pub struct DeclarationStmt {
     pub name: Ident,
     pub methods: Vec<FunctionStmt>,
-    pub fields: Vec<Ident>,
+    pub fields: Vec<(Ident, TypeAnnotation)>,
     pub embeds: Vec<Embed>,
     pub visibility: Visibility,
 }
@@ -548,7 +547,7 @@ impl fmt::Display for DeclarationStmt {
         let fields = self
             .fields
             .iter()
-            .map(|ident| ident.to_string() + " ")
+            .map(|ident| ident.0.to_string() + " ")
             .collect::<String>();
         let embeds = self
             .embeds
@@ -986,14 +985,20 @@ mod tests {
             },
             DeclarationStmt {
                 name: Ident("Test".to_owned()),
-                fields: vec![Ident("test".to_owned()), Ident("test".to_owned())],
+                fields: vec![
+                    (Ident("test".to_owned()), TypeAnnotation::default()),
+                    (Ident("test".to_owned()), TypeAnnotation::default()),
+                ],
                 methods: Vec::new(),
                 embeds: Vec::new(),
                 visibility: Visibility::Private,
             },
             DeclarationStmt {
                 name: Ident("Test".to_owned()),
-                fields: vec![Ident("test".to_owned()), Ident("test".to_owned())],
+                fields: vec![
+                    (Ident("test".to_owned()), TypeAnnotation::default()),
+                    (Ident("test".to_owned()), TypeAnnotation::default()),
+                ],
                 methods: vec![FunctionStmt {
                     name: Ident("testing".to_owned()),
                     params: Vec::new(),

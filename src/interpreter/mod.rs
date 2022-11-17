@@ -129,8 +129,40 @@ impl Interpreter {
                                 line,
                             )?;
                             let result = self.eval_infix_expr(op.into(), prev_val, value, line)?;
+                            if type_checked {
+                                let expect_type = instance
+                                    .component
+                                    .fields
+                                    .iter()
+                                    .filter_map(|(ident, ty)| (ident == &field).then_some(ty))
+                                    .last()
+                                    .expect("field should exist in component");
+                                if !result.fits_type(expect_type.clone()) {
+                                    return Err(RuntimeError::MismatchedAssignType {
+                                        name: field.0,
+                                        expected: expect_type.clone(),
+                                        got: result.scurry_type().into(),
+                                    });
+                                }
+                            }
                             instance.field_values.borrow_mut().insert(field.0, result);
                         } else {
+                            if type_checked {
+                                let expect_type = instance
+                                    .component
+                                    .fields
+                                    .iter()
+                                    .filter_map(|(ident, ty)| (ident == &field).then_some(ty))
+                                    .last()
+                                    .expect("field should exist in component");
+                                if !value.fits_type(expect_type.clone()) {
+                                    return Err(RuntimeError::MismatchedAssignType {
+                                        name: field.0,
+                                        expected: expect_type.clone(),
+                                        got: value.scurry_type().into(),
+                                    });
+                                }
+                            }
                             instance.field_values.borrow_mut().insert(field.0, value);
                         }
                     }
@@ -902,7 +934,7 @@ impl Interpreter {
                         Rc::clone(&rc_component)
                             .fields
                             .iter()
-                            .map(|name| (name.0.to_owned(), Object::Nil))
+                            .map(|(name, _)| (name.0.to_owned(), Object::Nil))
                             .collect(),
                     )),
                     embeds: Vec::new(),
@@ -1657,7 +1689,7 @@ mod tests {
         let expecteds = [
             Object::Component(Component {
                 name: Ident("Test".to_owned()),
-                fields: vec![Ident("field".to_owned())],
+                fields: vec![(Ident("field".to_owned()), TypeAnnotation::default())],
                 methods: HashMap::new(),
                 embeds: Vec::new(),
                 exports: Vec::new(),
@@ -1735,7 +1767,7 @@ mod tests {
             }),
             Object::Component(Component {
                 name: Ident("Test2".to_owned()),
-                fields: vec![Ident("field".to_owned())],
+                fields: vec![(Ident("field".to_owned()), TypeAnnotation::default())],
                 methods: HashMap::new(),
                 embeds: vec![(
                     Component {
@@ -1790,7 +1822,7 @@ mod tests {
             Object::Instance(Instance {
                 component: Rc::new(Component {
                     name: Ident("Test".to_owned()),
-                    fields: vec![Ident("field".to_owned())],
+                    fields: vec![(Ident("field".to_owned()), TypeAnnotation::default())],
                     methods: HashMap::new(),
                     embeds: Vec::new(),
                     exports: Vec::new(),
@@ -2323,6 +2355,18 @@ mod tests {
             field: "field".to_owned(),
             obj: Type::Instance("Test".to_owned()),
             line: 1,
+        }];
+
+        runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn type_checked_field_assign_throws_error_with_mismatched_type() {
+        let inputs = ["decl Test { field: Int fn $new(self) { self.field! = 3.3; } }; Test();"];
+        let errs = [RuntimeError::MismatchedAssignType {
+            name: "field".to_owned(),
+            expected: TypeAnnotation::from_iter([AstType::Int]),
+            got: AstType::Float,
         }];
 
         runtime_error_eval!(inputs, errs)

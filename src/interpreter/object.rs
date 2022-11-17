@@ -284,7 +284,7 @@ impl fmt::Display for Type {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Component {
     pub name: Ident,
-    pub fields: Vec<Ident>,
+    pub fields: Vec<(Ident, TypeAnnotation)>,
     pub methods: HashMap<String, Object>,
     pub embeds: Vec<(Component, Vec<Expr>)>,
     pub exports: Vec<String>,

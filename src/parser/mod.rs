@@ -686,7 +686,10 @@ impl<'a> Parser<'a> {
         while self.current_token != Token::Rbrace {
             match &self.current_token {
                 Token::Ident(ident) => {
-                    fields.push(Ident(ident.to_owned()));
+                    fields.push((
+                        Ident(ident.to_owned()),
+                        self.parse_type_annotation(Token::Colon)?,
+                    ));
                     if !matches!(
                         self.peek_token,
                         Token::Lbracket | Token::Rbrace | Token::Export | Token::Function
@@ -1785,7 +1788,10 @@ mod tests {
             Stmt::Declaration(DeclarationStmt {
                 name: Ident("Test".to_owned()),
                 methods: Vec::new(),
-                fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                fields: vec![
+                    (Ident("field1".to_owned()), TypeAnnotation::default()),
+                    (Ident("field2".to_owned()), TypeAnnotation::default()),
+                ],
                 embeds: Vec::new(),
                 visibility: Visibility::Private,
             }),
@@ -1801,7 +1807,10 @@ mod tests {
                     visibility: Visibility::Private,
                     return_type: TypeAnnotation::default(),
                 }],
-                fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                fields: vec![
+                    (Ident("field1".to_owned()), TypeAnnotation::default()),
+                    (Ident("field2".to_owned()), TypeAnnotation::default()),
+                ],
                 embeds: Vec::new(),
                 visibility: Visibility::Private,
             }),
@@ -1817,7 +1826,10 @@ mod tests {
                     visibility: Visibility::Private,
                     return_type: TypeAnnotation::default(),
                 }],
-                fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                fields: vec![
+                    (Ident("field1".to_owned()), TypeAnnotation::default()),
+                    (Ident("field2".to_owned()), TypeAnnotation::default()),
+                ],
                 embeds: vec![Embed {
                     name: Ident("Testing".to_owned()),
                     assigned: vec![
@@ -1847,7 +1859,10 @@ mod tests {
                     visibility: Visibility::Private,
                     return_type: TypeAnnotation::default(),
                 }],
-                fields: vec![Ident("field1".to_owned()), Ident("field2".to_owned())],
+                fields: vec![
+                    (Ident("field1".to_owned()), TypeAnnotation::default()),
+                    (Ident("field2".to_owned()), TypeAnnotation::default()),
+                ],
                 embeds: vec![Embed {
                     name: Ident("Testing".to_owned()),
                     assigned: Vec::new(),
@@ -2321,6 +2336,32 @@ mod tests {
             line: 1,
             var_type: TypeAnnotation::default(),
             type_checked: true,
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_annotations_in_component_fields() {
+        let inputs = ["decl Test { field: Int, field2: String | Test }"];
+        let expecteds = [Stmt::Declaration(DeclarationStmt {
+            name: Ident("Test".to_owned()),
+            methods: Vec::new(),
+            fields: vec![
+                (
+                    Ident("field".to_owned()),
+                    TypeAnnotation::from_iter([AstType::Int]),
+                ),
+                (
+                    Ident("field2".to_owned()),
+                    TypeAnnotation::from_iter([
+                        AstType::String,
+                        AstType::Component("Test".to_owned()),
+                    ]),
+                ),
+            ],
+            embeds: Vec::new(),
+            visibility: Visibility::Private,
         })];
 
         test_parse!(inputs, expecteds)
