@@ -78,20 +78,16 @@ pub struct FunctionExpr {
 
 impl fmt::Display for FunctionExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.params.is_empty() {
-            return write!(f, "fn() {}", self.block);
-        }
         let joined = self
             .params
             .iter()
-            .map(|ident| ident.0.to_string() + ", ")
+            .map(|(ident, ty)| format!("{}: {}, ", ident, ty))
             .collect::<String>();
         write!(
             f,
-            "fn({}) {}",
-            joined
-                .strip_suffix(", ")
-                .expect("Should always have a trailing ', '"),
+            "fn({}) > {} {}",
+            joined.strip_suffix(", ").unwrap_or_default(),
+            self.return_type,
             self.block,
         )
     }
@@ -114,9 +110,10 @@ impl fmt::Display for CallExpr {
             .collect::<String>();
         write!(
             f,
-            "{}({})",
+            "{}({}){}",
             self.func,
-            args.strip_suffix(", ").unwrap_or_default()
+            args.strip_suffix(", ").unwrap_or_default(),
+            self.type_checked.then_some("!").unwrap_or_default()
         )
     }
 }
@@ -151,13 +148,7 @@ impl fmt::Display for Literal {
             Self::Nil => write!(f, "Nil"),
             Self::Integer(i) => write!(f, "{i}"),
             Self::Float(float) => write!(f, "{float}"),
-            Self::Boolean(b) => write!(f, "{}", {
-                if *b {
-                    "True"
-                } else {
-                    "False"
-                }
-            }),
+            Self::Boolean(b) => write!(f, "{}", b.then_some("True").unwrap_or("False")),
             Self::String(s) => write!(f, "\"{s}\""),
             Self::Array(arr) => {
                 let joined = arr
@@ -333,14 +324,25 @@ pub struct AssignStmt {
     pub name: Expr,
     pub value: Expr,
     pub operator: Option<AssignOp>,
-    pub line: usize,
     pub var_type: TypeAnnotation,
     pub type_checked: bool,
+    pub line: usize,
 }
 
 impl fmt::Display for AssignStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} = {};", self.name, self.value)
+        write!(
+            f,
+            "{}{}: {} {}= {};",
+            self.name,
+            self.type_checked.then_some("!").unwrap_or_default(),
+            self.var_type,
+            self.operator
+                .as_ref()
+                .map(|op| op.to_string())
+                .unwrap_or_default(),
+            self.value
+        )
     }
 }
 
@@ -351,6 +353,18 @@ pub enum AssignOp {
     Multiply,
     Divide,
     Modulo,
+}
+
+impl fmt::Display for AssignOp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Plus => write!(f, "+"),
+            Self::Minus => write!(f, "-"),
+            Self::Multiply => write!(f, "*"),
+            Self::Divide => write!(f, "/"),
+            Self::Modulo => write!(f, "%"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -437,25 +451,20 @@ impl fmt::Display for FunctionStmt {
         let joined = self
             .params
             .iter()
-            .map(|ident| ident.0.to_string() + ", ")
+            .map(|(ident, ty)| format!("{}: {}, ", ident, ty))
             .collect::<String>();
-        if self.visibility == Visibility::Public {
-            write!(
-                f,
-                "exp fn {}({}) {}",
-                self.name,
-                joined.strip_suffix(", ").unwrap_or(""),
-                self.block,
-            )
-        } else {
-            write!(
-                f,
-                "fn {}({}) {}",
-                self.name,
-                joined.strip_suffix(", ").unwrap_or(""),
-                self.block,
-            )
-        }
+        write!(
+            f,
+            "{}fn {}({}) > {} {}",
+            self.visibility
+                .is_public()
+                .then_some("exp ")
+                .unwrap_or_default(),
+            self.name,
+            joined.strip_suffix(", ").unwrap_or_default(),
+            self.return_type,
+            self.block,
+        )
     }
 }
 
@@ -537,7 +546,15 @@ pub struct DeclarationStmt {
 impl fmt::Display for DeclarationStmt {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.methods.is_empty() && self.fields.is_empty() && self.embeds.is_empty() {
-            return write!(f, "decl {} {{}}", self.name);
+            return write!(
+                f,
+                "{}decl {} {{}}",
+                self.visibility
+                    .is_public()
+                    .then_some("exp ")
+                    .unwrap_or_default(),
+                self.name
+            );
         }
         let methods = self
             .methods
@@ -547,14 +564,22 @@ impl fmt::Display for DeclarationStmt {
         let fields = self
             .fields
             .iter()
-            .map(|ident| ident.0.to_string() + " ")
+            .map(|(ident, ty)| format!("{ident}: {ty}, "))
             .collect::<String>();
         let embeds = self
             .embeds
             .iter()
             .map(|embed| embed.to_string() + " ")
             .collect::<String>();
-        write!(f, "decl {} {{ {fields}{embeds}{methods}}}", self.name)
+        write!(
+            f,
+            "{}decl {} {{ {fields}{embeds}{methods}}}",
+            self.visibility
+                .is_public()
+                .then_some("exp ")
+                .unwrap_or_default(),
+            self.name
+        )
     }
 }
 
@@ -583,6 +608,12 @@ impl fmt::Display for Embed {
 pub enum Visibility {
     Public,
     Private,
+}
+
+impl Visibility {
+    fn is_public(&self) -> bool {
+        self == &Self::Public
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -639,8 +670,8 @@ impl fmt::Display for AstType {
             Self::Nil => write!(f, "Nil"),
             Self::ComponentDecl => write!(f, "Decl"),
             Self::Module => write!(f, "Mod"),
-            Self::Component(name) => write!(f, "{}", name),
-            Self::HasComponent(name) => write!(f, "^{}", name),
+            Self::Component(name) => write!(f, "{name}"),
+            Self::HasComponent(name) => write!(f, "^{name}"),
         }
     }
 }
@@ -813,16 +844,34 @@ mod tests {
 
     #[test]
     fn assign_stmt_display() {
-        let inputs = [AssignStmt {
-            name: Expr::Ident(Ident("x".to_owned())),
-            value: Expr::Literal(Literal::Integer(3)),
-            line: 1,
-            operator: None,
-            var_type: TypeAnnotation::default(),
-            type_checked: false,
-        }];
+        let inputs = [
+            AssignStmt {
+                name: Expr::Ident(Ident("x".to_owned())),
+                value: Expr::Literal(Literal::Integer(3)),
+                line: 1,
+                operator: None,
+                var_type: TypeAnnotation::default(),
+                type_checked: false,
+            },
+            AssignStmt {
+                name: Expr::Ident(Ident("x".to_owned())),
+                value: Expr::Literal(Literal::Integer(3)),
+                line: 1,
+                operator: Some(AssignOp::Plus),
+                var_type: TypeAnnotation::default(),
+                type_checked: false,
+            },
+            AssignStmt {
+                name: Expr::Ident(Ident("x".to_owned())),
+                value: Expr::Literal(Literal::Integer(3)),
+                line: 1,
+                operator: None,
+                var_type: TypeAnnotation::default(),
+                type_checked: true,
+            },
+        ];
 
-        let expecteds = ["x = 3;"];
+        let expecteds = ["x: Any = 3;", "x: Any += 3;", "x!: Any = 3;"];
 
         test_to_string!(inputs, expecteds)
     }
@@ -940,8 +989,20 @@ mod tests {
                 visibility: Visibility::Private,
                 return_type: TypeAnnotation::default(),
             },
+            FunctionStmt {
+                name: Ident("x".to_owned()),
+                params: Vec::new(),
+                block: Block(Vec::new()),
+                visibility: Visibility::Public,
+                return_type: TypeAnnotation::default(),
+            },
         ];
-        let expecteds = ["fn x(y) { 3; }", "fn x(y, z) { 3; }", "fn x() { 3; }"];
+        let expecteds = [
+            "fn x(y: Any) > Any { 3; }",
+            "fn x(y: Any, z: Any) > Any { 3; }",
+            "fn x() > Any { 3; }",
+            "exp fn x() > Any {}",
+        ];
 
         test_to_string!(inputs, expecteds)
     }
@@ -968,7 +1029,11 @@ mod tests {
                 return_type: TypeAnnotation::default(),
             },
         ];
-        let expecteds = ["fn(x) { True; }", "fn(x, y) { True; }", "fn() { True; }"];
+        let expecteds = [
+            "fn(x: Any) > Any { True; }",
+            "fn(x: Any, y: Any) > Any { True; }",
+            "fn() > Any { True; }",
+        ];
 
         test_to_string!(inputs, expecteds)
     }
@@ -1009,11 +1074,19 @@ mod tests {
                 embeds: Vec::new(),
                 visibility: Visibility::Private,
             },
+            DeclarationStmt {
+                name: Ident("Test".to_owned()),
+                methods: Vec::new(),
+                fields: Vec::new(),
+                embeds: Vec::new(),
+                visibility: Visibility::Public,
+            },
         ];
         let expecteds = [
             "decl Test {}",
-            "decl Test { test test }",
-            "decl Test { test test fn testing() {} }",
+            "decl Test { test: Any, test: Any, }",
+            "decl Test { test: Any, test: Any, fn testing() > Any {} }",
+            "exp decl Test {}",
         ];
 
         test_to_string!(inputs, expecteds)
@@ -1043,8 +1116,14 @@ mod tests {
                 type_checked: false,
                 line: 1,
             },
+            CallExpr {
+                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                args: Vec::new(),
+                type_checked: true,
+                line: 1,
+            },
         ];
-        let expecteds = ["test(4, testing)", "test(4)", "test()"];
+        let expecteds = ["test(4, testing)", "test(4)", "test()", "test()!"];
 
         test_to_string!(inputs, expecteds)
     }
