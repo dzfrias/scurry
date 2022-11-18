@@ -453,17 +453,21 @@ pub enum RuntimeError {
         contents: String,
         errs: Vec<ParserError>,
     },
-    #[error("wrong argument type `{name}`, expected `{expected}`, got `{got}`")]
+    #[error("wrong argument type `{name}`, expected `{expected}`, got `{got}` on line {line}")]
     WrongArgType {
         name: String,
         expected: TypeAnnotation,
         got: AstType,
+        line: usize,
     },
-    #[error("mismatched assign type on `{name}`, expected `{expected}`, got `{got}`")]
+    #[error(
+        "mismatched assign type on `{name}`, expected `{expected}`, got `{got}` on line {line}"
+    )]
     MismatchedAssignType {
         name: String,
         expected: TypeAnnotation,
         got: AstType,
+        line: usize,
     },
 }
 

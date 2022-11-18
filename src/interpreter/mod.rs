@@ -89,6 +89,7 @@ impl Interpreter {
                                     name: ident.0.clone(),
                                     expected: var_type,
                                     got: result.scurry_type().into(),
+                                    line,
                                 });
                             }
                             self.env.borrow_mut().set(ident.0, result);
@@ -98,6 +99,7 @@ impl Interpreter {
                                     name: ident.0.clone(),
                                     expected: var_type,
                                     got: value.scurry_type().into(),
+                                    line,
                                 });
                             }
                             self.env.borrow_mut().set(ident.0, value);
@@ -142,6 +144,7 @@ impl Interpreter {
                                         name: field.0,
                                         expected: expect_type.clone(),
                                         got: result.scurry_type().into(),
+                                        line,
                                     });
                                 }
                             }
@@ -160,6 +163,7 @@ impl Interpreter {
                                         name: field.0,
                                         expected: expect_type.clone(),
                                         got: value.scurry_type().into(),
+                                        line,
                                     });
                                 }
                             }
@@ -900,6 +904,7 @@ impl Interpreter {
                                 name: name.0.clone(),
                                 expected: ty.clone(),
                                 got: arg.scurry_type().into(),
+                                line,
                             });
                         }
                     }
@@ -2309,11 +2314,13 @@ mod tests {
                 name: "y".to_owned(),
                 expected: TypeAnnotation::from_iter([AstType::Int]),
                 got: AstType::Float,
+                line: 1,
             },
             RuntimeError::WrongArgType {
                 name: "y".to_owned(),
                 expected: TypeAnnotation::from_iter([AstType::Int, AstType::Float]),
                 got: AstType::Array,
+                line: 1,
             },
         ];
 
@@ -2343,6 +2350,7 @@ mod tests {
             name: "x".to_owned(),
             expected: TypeAnnotation::from_iter([AstType::Int]),
             got: AstType::Float,
+            line: 1,
         }];
 
         runtime_error_eval!(inputs, errs)
@@ -2367,6 +2375,7 @@ mod tests {
             name: "field".to_owned(),
             expected: TypeAnnotation::from_iter([AstType::Int]),
             got: AstType::Float,
+            line: 1,
         }];
 
         runtime_error_eval!(inputs, errs)
