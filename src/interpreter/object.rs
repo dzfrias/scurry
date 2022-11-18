@@ -179,7 +179,7 @@ impl fmt::Display for Object {
                     "False"
                 }
             }),
-            Self::String(s) => write!(f, "{}", s),
+            Self::String(s) => write!(f, "\"{}\"", s),
             Self::Array(arr) => {
                 let joined = arr
                     .borrow()
@@ -406,7 +406,7 @@ pub enum RuntimeError {
         right: Number,
         line: usize,
     },
-    #[error("index of `{index}` out of range in array `{obj}` on line {line}")]
+    #[error("index of `{index}` out of range in `{obj}` on line {line}")]
     IndexOutOfRange {
         obj: Object,
         index: i32,
