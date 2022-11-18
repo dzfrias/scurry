@@ -1,0 +1,61 @@
+// The `decl` keyword is used to declare components
+decl Voice {
+    sound
+
+    // Called on instantiation
+    fn $new(self, sound: String) {
+        self.sound = sound;
+    }
+
+    // `exp` denotes public functions
+    exp fn speak(self) {
+        println(self.sound);
+    }
+}
+
+decl Cat {
+    height: Int,
+    name: String
+
+    [Voice] {
+        // Passed into Voice's $new
+        "Meow!"
+    }
+
+    fn $new(self, name: String) {
+        self.height = 0;
+        self.name = name;
+    }
+
+    exp fn climb(self, meters: Int) {
+        self.height += meters;
+        self.speak();
+        println("The cat is now", self.height, "meters up!");
+    }
+}
+
+decl Dog {
+    distance: Int,
+    name: String
+
+    [Voice] {
+        "Woof!"
+    }
+
+    fn $new(self, name: String) {
+        self.distance = 0;
+        self.name = name;
+    }
+
+    exp fn move(self, meters: Int) {
+        self.distance += meters;
+        self.speak();
+        println("The dog is now", self.distance, "meters away!");
+    }
+}
+
+cat = Cat("Cornelius");
+dog = Dog("George");
+
+dog.move(3);
+cat.climb(2);
