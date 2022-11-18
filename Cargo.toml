@@ -12,7 +12,7 @@ categories = ["compilers"]
 rust-version = "1.65.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+exclude = ["/website", "/examples"]
 
 [dependencies]
 logos = "0.12.1"
