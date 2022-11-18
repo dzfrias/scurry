@@ -80,9 +80,9 @@ impl Interpreter {
             }) => {
                 let value = self.eval_expr(value)?;
                 match name {
-                    Expr::Ident(ident) => {
+                    Expr::Ident(ident, _) => {
                         if let Some(op) = operator {
-                            let prev_val = self.eval_ident(&ident.0)?;
+                            let prev_val = self.eval_ident(&ident.0, line)?;
                             let result = self.eval_infix_expr(op.into(), prev_val, value, line)?;
                             if type_checked && !result.fits_type(var_type.clone()) {
                                 return Err(RuntimeError::MismatchedAssignType {
@@ -375,7 +375,7 @@ impl Interpreter {
                 }
                 Ok(Object::Map(Rc::new(RefCell::new(pairs))))
             }
-            Expr::Ident(Ident(name)) => self.eval_ident(&name),
+            Expr::Ident(Ident(name), line) => self.eval_ident(&name, line),
             Expr::Index(IndexExpr { left, index, line }) => {
                 let expr = self.eval_expr(*left)?;
                 let index = self.eval_expr(*index)?;
@@ -425,7 +425,7 @@ impl Interpreter {
         }
     }
 
-    fn eval_ident(&self, name: &str) -> EvalResult {
+    fn eval_ident(&self, name: &str, line: usize) -> EvalResult {
         let val = self.env.borrow().get(name);
         if let Some(val) = val {
             Ok(val)
@@ -434,7 +434,7 @@ impl Interpreter {
         } else {
             Err(RuntimeError::VariableNotFound {
                 name: name.to_owned(),
-                line: 0,
+                line,
             })
         }
     }
@@ -952,7 +952,7 @@ impl Interpreter {
                 for (embed, assigned) in &Rc::clone(&rc_component).embeds {
                     let mut args = Vec::new();
                     for expr in assigned {
-                        if let Expr::Ident(field) = expr {
+                        if let Expr::Ident(field, _) = expr {
                             let arg = if let Some(field_val) =
                                 instance.field_values.borrow().get(&field.0)
                             {
@@ -1799,7 +1799,7 @@ mod tests {
                         exports: Vec::new(),
                         visibility: Visibility::Private,
                     },
-                    vec![Expr::Ident(Ident("field".to_owned()))],
+                    vec![Expr::Ident(Ident("field".to_owned()), 1)],
                 )],
                 exports: Vec::new(),
                 visibility: Visibility::Private,

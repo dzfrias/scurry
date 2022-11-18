@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expr {
-    Ident(Ident),
+    Ident(Ident, usize),
     Literal(Literal),
     Infix(InfixExpr),
     Prefix(PrefixExpr),
@@ -17,7 +17,7 @@ pub enum Expr {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Ident(ident) => write!(f, "{ident}"),
+            Self::Ident(ident, _) => write!(f, "{ident}"),
             Self::Literal(literal) => write!(f, "{literal}"),
             Self::Infix(infix) => write!(f, "{infix}"),
             Self::Prefix(prefix) => write!(f, "{prefix}"),
@@ -747,7 +747,7 @@ mod tests {
             Literal::Array(vec![Expr::Literal(Literal::Integer(3))]),
             Literal::Array(vec![
                 Expr::Literal(Literal::Integer(3)),
-                Expr::Ident(Ident("x".to_owned())),
+                Expr::Ident(Ident("x".to_owned()), 1),
             ]),
             Literal::Array(Vec::new()),
             Literal::Map(vec![(
@@ -846,7 +846,7 @@ mod tests {
     fn assign_stmt_display() {
         let inputs = [
             AssignStmt {
-                name: Expr::Ident(Ident("x".to_owned())),
+                name: Expr::Ident(Ident("x".to_owned()), 1),
                 value: Expr::Literal(Literal::Integer(3)),
                 line: 1,
                 operator: None,
@@ -854,7 +854,7 @@ mod tests {
                 type_checked: false,
             },
             AssignStmt {
-                name: Expr::Ident(Ident("x".to_owned())),
+                name: Expr::Ident(Ident("x".to_owned()), 1),
                 value: Expr::Literal(Literal::Integer(3)),
                 line: 1,
                 operator: Some(AssignOp::Plus),
@@ -862,7 +862,7 @@ mod tests {
                 type_checked: false,
             },
             AssignStmt {
-                name: Expr::Ident(Ident("x".to_owned())),
+                name: Expr::Ident(Ident("x".to_owned()), 1),
                 value: Expr::Literal(Literal::Integer(3)),
                 line: 1,
                 operator: None,
@@ -941,10 +941,10 @@ mod tests {
         let inputs = [ForStmt {
             iter_ident: Ident("i".to_owned()),
             expr: Expr::Literal(Literal::Integer(3)),
-            block: Block(vec![Stmt::Expr(Expr::Ident(Ident("i".to_owned())))]),
+            block: Block(Vec::new()),
             line: 1,
         }];
-        let expecteds = ["for i in 3 { i; }"];
+        let expecteds = ["for i in 3 {}"];
 
         test_to_string!(inputs, expecteds)
     }
@@ -1096,28 +1096,28 @@ mod tests {
     fn call_expr_display() {
         let inputs = [
             CallExpr {
-                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                func: Box::new(Expr::Ident(Ident("test".to_owned()), 1)),
                 args: vec![
                     Expr::Literal(Literal::Integer(4)),
-                    Expr::Ident(Ident("testing".to_owned())),
+                    Expr::Ident(Ident("testing".to_owned()), 1),
                 ],
                 type_checked: false,
                 line: 1,
             },
             CallExpr {
-                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                func: Box::new(Expr::Ident(Ident("test".to_owned()), 1)),
                 args: vec![Expr::Literal(Literal::Integer(4))],
                 type_checked: false,
                 line: 1,
             },
             CallExpr {
-                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                func: Box::new(Expr::Ident(Ident("test".to_owned()), 1)),
                 args: Vec::new(),
                 type_checked: false,
                 line: 1,
             },
             CallExpr {
-                func: Box::new(Expr::Ident(Ident("test".to_owned()))),
+                func: Box::new(Expr::Ident(Ident("test".to_owned()), 1)),
                 args: Vec::new(),
                 type_checked: true,
                 line: 1,
@@ -1132,18 +1132,18 @@ mod tests {
     fn switch_stmt_display() {
         let inputs = [
             SwitchStmt {
-                expr: Expr::Ident(Ident("x".to_owned())),
+                expr: Expr::Ident(Ident("x".to_owned()), 1),
                 cases: vec![Case {
-                    conditions: vec![Expr::Ident(Ident("y".to_owned()))],
+                    conditions: vec![Expr::Ident(Ident("y".to_owned()), 1)],
                     block: Block(Vec::new()),
                 }],
                 default: None,
             },
             SwitchStmt {
-                expr: Expr::Ident(Ident("x".to_owned())),
+                expr: Expr::Ident(Ident("x".to_owned()), 1),
                 cases: vec![
                     Case {
-                        conditions: vec![Expr::Ident(Ident("y".to_owned()))],
+                        conditions: vec![Expr::Ident(Ident("y".to_owned()), 1)],
                         block: Block(Vec::new()),
                     },
                     Case {
@@ -1154,29 +1154,29 @@ mod tests {
                 default: None,
             },
             SwitchStmt {
-                expr: Expr::Ident(Ident("x".to_owned())),
+                expr: Expr::Ident(Ident("x".to_owned()), 1),
                 cases: Vec::new(),
                 default: None,
             },
             SwitchStmt {
-                expr: Expr::Ident(Ident("x".to_owned())),
+                expr: Expr::Ident(Ident("x".to_owned()), 1),
                 cases: vec![Case {
-                    conditions: vec![Expr::Ident(Ident("y".to_owned()))],
+                    conditions: vec![Expr::Ident(Ident("y".to_owned()), 1)],
                     block: Block(Vec::new()),
                 }],
                 default: Some(Block(Vec::new())),
             },
             SwitchStmt {
-                expr: Expr::Ident(Ident("x".to_owned())),
+                expr: Expr::Ident(Ident("x".to_owned()), 1),
                 cases: Vec::new(),
                 default: Some(Block(Vec::new())),
             },
             SwitchStmt {
-                expr: Expr::Ident(Ident("x".to_owned())),
+                expr: Expr::Ident(Ident("x".to_owned()), 1),
                 cases: vec![Case {
                     conditions: vec![
-                        Expr::Ident(Ident("y".to_owned())),
-                        Expr::Ident(Ident("z".to_owned())),
+                        Expr::Ident(Ident("y".to_owned()), 1),
+                        Expr::Ident(Ident("z".to_owned()), 1),
                     ],
                     block: Block(Vec::new()),
                 }],
