@@ -37,6 +37,7 @@ You can also start up the Scurry REPL, just enter `scurry` into your shell.
 >> println("This is the REPL!");
 This is the REPL!
 Nil
+
 >>
 ```
 The `println` function returns `Nil`. We can get into those details later.
@@ -49,7 +50,7 @@ The documentation is split up into three sections. The basics, builtin features,
 and a more nuanced look into components.
 
 ### The Basics
-The basics include:
+[The basics](./category/the-basics) include:
 - Syntax
 - Scurry's builtin types
 - Basic components
