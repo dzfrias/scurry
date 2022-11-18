@@ -86,7 +86,7 @@ impl Interpreter {
                             let result = self.eval_infix_expr(op.into(), prev_val, value, line)?;
                             if type_checked && !result.fits_type(var_type.clone()) {
                                 return Err(RuntimeError::MismatchedAssignType {
-                                    name: ident.0.clone(),
+                                    name: ident.0,
                                     expected: var_type,
                                     got: result.scurry_type().into(),
                                     line,
@@ -96,7 +96,7 @@ impl Interpreter {
                         } else {
                             if type_checked && !value.fits_type(var_type.clone()) {
                                 return Err(RuntimeError::MismatchedAssignType {
-                                    name: ident.0.clone(),
+                                    name: ident.0,
                                     expected: var_type,
                                     got: value.scurry_type().into(),
                                     line,
@@ -493,9 +493,7 @@ impl Interpreter {
         macro_rules! special_op {
             ($instance:expr, $name:ident) => {
                 if let Some(add) = $instance.get_special(SpecialMethod::$name) {
-                    let mut args = Vec::new();
-                    args.push(Object::Instance($instance.clone_with_private()));
-                    args.push(right);
+                    let args = vec![Object::Instance($instance.clone_with_private()), right];
                     self.eval_call_expr(add.clone(), args, false, line)
                 } else {
                     unreachable!()
@@ -1068,26 +1066,24 @@ impl Interpreter {
                     }
                     None => {
                         for embed in embeds {
-                            match embed.component.methods.get(&field) {
-                                Some(Object::Function {
-                                    params, body, env, ..
-                                }) => {
-                                    if !embed.component.exports.contains(&field) {
-                                        return Err(RuntimeError::UnrecognizedField {
-                                            field,
-                                            obj: left.scurry_type(),
-                                            line,
-                                        });
-                                    }
-                                    return Ok(Object::Function {
-                                        params: params.clone(),
-                                        body: body.clone(),
-                                        env: env.clone(),
-                                        bound: Some(Rc::new(embed.clone())),
-                                        visibility: None,
+                            if let Some(Object::Function {
+                                params, body, env, ..
+                            }) = embed.component.methods.get(&field)
+                            {
+                                if !embed.component.exports.contains(&field) {
+                                    return Err(RuntimeError::UnrecognizedField {
+                                        field,
+                                        obj: left.scurry_type(),
+                                        line,
                                     });
                                 }
-                                _ => unreachable!(),
+                                return Ok(Object::Function {
+                                    params: params.clone(),
+                                    body: body.clone(),
+                                    env: env.clone(),
+                                    bound: Some(Rc::new(embed.clone())),
+                                    visibility: None,
+                                });
                             }
                         }
                         Err(RuntimeError::UnrecognizedField {
