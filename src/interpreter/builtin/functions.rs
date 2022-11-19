@@ -16,7 +16,13 @@ pub fn println(args: Vec<Object>, _line: usize) -> EvalResult {
     println!(
         "{}",
         args.into_iter()
-            .map(|arg| arg.to_string() + " ")
+            .map(|arg| {
+                if let Object::String(s) = arg {
+                    format!("\"{s}\" ")
+                } else {
+                    arg.to_string() + " "
+                }
+            })
             .collect::<String>()
     );
     Ok(Object::Nil)
