@@ -586,7 +586,7 @@ impl fmt::Display for DeclarationStmt {
 #[derive(Debug, PartialEq, Clone)]
 pub struct Embed {
     pub name: Ident,
-    pub assigned: Vec<Expr>,
+    pub assigned: Vec<EmbedField>,
     pub line: usize,
 }
 
@@ -601,6 +601,21 @@ impl fmt::Display for Embed {
             .map(|embed| embed.to_string() + ", ")
             .collect::<String>();
         write!(f, "[{}] {{ {assigned} }}", self.name)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum EmbedField {
+    Expr(Expr),
+    ParentField(String),
+}
+
+impl fmt::Display for EmbedField {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Expr(e) => write!(f, "{e}"),
+            Self::ParentField(field) => write!(f, "{field}"),
+        }
     }
 }
 

@@ -949,18 +949,23 @@ impl Interpreter {
                 }
                 for (embed, assigned) in &Rc::clone(&rc_component).embeds {
                     let mut args = Vec::new();
-                    for expr in assigned {
-                        if let Expr::Ident(field, _) = expr {
-                            let arg = if let Some(field_val) =
-                                instance.field_values.borrow().get(&field.0)
-                            {
-                                field_val.clone()
-                            } else {
-                                self.eval_expr(expr.clone())?
-                            };
-                            args.push(arg)
-                        } else {
-                            args.push(self.eval_expr(expr.clone())?)
+                    for embed_field in assigned {
+                        match embed_field {
+                            EmbedField::ParentField(field) => {
+                                let arg = if let Some(field_val) =
+                                    instance.field_values.borrow().get(field)
+                                {
+                                    field_val.clone()
+                                } else {
+                                    return Err(RuntimeError::UnrecognizedField {
+                                        field: field.clone(),
+                                        obj: Type::Instance(instance.component.name.0.clone()),
+                                        line,
+                                    });
+                                };
+                                args.push(arg)
+                            }
+                            EmbedField::Expr(expr) => args.push(self.eval_expr(expr.clone())?),
                         }
                     }
                     let embed_instance =
@@ -1795,7 +1800,7 @@ mod tests {
                         exports: Vec::new(),
                         visibility: Visibility::Private,
                     },
-                    vec![Expr::Ident(Ident("field".to_owned()), 1)],
+                    vec![EmbedField::Expr(Expr::Ident(Ident("field".to_owned()), 1))],
                 )],
                 exports: Vec::new(),
                 visibility: Visibility::Private,
@@ -2375,5 +2380,24 @@ mod tests {
         }];
 
         runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn parent_field_assignment_to_embed() {
+        let inputs = ["
+            decl Test {
+                field
+                fn $new(self, field) { self.field = field; }
+                exp fn value(self) { return self.field; }
+            }
+            decl Test2 {
+                field
+                [Test] { .field }
+            }
+            test = Test2();
+            test.value();"];
+        let expecteds = [Object::Nil];
+
+        test_eval!(inputs, expecteds)
     }
 }

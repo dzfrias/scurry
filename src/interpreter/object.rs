@@ -286,7 +286,7 @@ pub struct Component {
     pub name: Ident,
     pub fields: Vec<(Ident, TypeAnnotation)>,
     pub methods: HashMap<String, Object>,
-    pub embeds: Vec<(Component, Vec<Expr>)>,
+    pub embeds: Vec<(Component, Vec<EmbedField>)>,
     pub exports: Vec<String>,
     pub visibility: Visibility,
 }
