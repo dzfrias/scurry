@@ -956,17 +956,11 @@ impl Interpreter {
                     for embed_field in &embed.assigned {
                         match embed_field {
                             EmbedField::ParentField(field) => {
-                                let arg = if let Some(field_val) =
-                                    instance.field_values.borrow().get(field)
-                                {
-                                    field_val.clone()
-                                } else {
-                                    return Err(RuntimeError::UnrecognizedField {
-                                        field: field.clone(),
-                                        obj: Type::Instance(instance.component.name.0.clone()),
-                                        line,
-                                    });
-                                };
+                                let arg = self.eval_dot_expr(
+                                    Object::Instance(instance.clone_with_private()),
+                                    field.to_owned(),
+                                    line,
+                                )?;
                                 args.push(arg)
                             }
                             EmbedField::Expr(expr) => args.push(self.eval_expr(expr.clone())?),
