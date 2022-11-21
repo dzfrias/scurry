@@ -705,6 +705,14 @@ impl<'a> Parser<'a> {
                     self.next_token();
                     let embed_name = self.parse_ident()?;
                     self.expect_peek(Token::Rbracket)?;
+                    let type_checked = {
+                        if self.peek_token == Token::Bang {
+                            self.next_token();
+                            true
+                        } else {
+                            false
+                        }
+                    };
                     self.expect_peek(Token::Lbrace)?;
                     self.next_token();
                     let mut assigned = Vec::new();
@@ -733,6 +741,7 @@ impl<'a> Parser<'a> {
                     embeds.push(Embed {
                         name: embed_name,
                         assigned,
+                        type_checked,
                         line: self.line,
                     })
                 }
@@ -1850,6 +1859,7 @@ mod tests {
                         EmbedField::Expr(Expr::Ident(Ident("field1".to_owned()), 1)),
                         EmbedField::Expr(Expr::Ident(Ident("field2".to_owned()), 1)),
                     ],
+                    type_checked: false,
                     line: 1,
                 }],
                 visibility: Visibility::Private,
@@ -1880,6 +1890,7 @@ mod tests {
                 embeds: vec![Embed {
                     name: Ident("Testing".to_owned()),
                     assigned: Vec::new(),
+                    type_checked: false,
                     line: 1,
                 }],
                 visibility: Visibility::Private,
@@ -1914,6 +1925,7 @@ mod tests {
                     })),
                     EmbedField::Expr(Expr::Literal(Literal::String("hello".to_owned()))),
                 ],
+                type_checked: false,
                 line: 1,
             }],
             visibility: Visibility::Private,
@@ -2391,6 +2403,26 @@ mod tests {
             embeds: vec![Embed {
                 name: Ident("Test2".to_owned()),
                 assigned: vec![EmbedField::ParentField("test".to_owned())],
+                type_checked: false,
+                line: 1,
+            }],
+            visibility: Visibility::Private,
+        })];
+
+        test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_type_checked_embed() {
+        let inputs = ["decl Test { [Test2]! {} }"];
+        let expecteds = [Stmt::Declaration(DeclarationStmt {
+            name: Ident("Test".to_owned()),
+            methods: Vec::new(),
+            fields: Vec::new(),
+            embeds: vec![Embed {
+                name: Ident("Test2".to_owned()),
+                assigned: Vec::new(),
+                type_checked: true,
                 line: 1,
             }],
             visibility: Visibility::Private,

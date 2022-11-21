@@ -291,7 +291,11 @@ impl Interpreter {
                                 });
                             }
                         };
-                        embedded.push((embed_component, embed.assigned));
+                        embedded.push(EmbedComponent {
+                            component: embed_component,
+                            assigned: embed.assigned,
+                            type_checked: embed.type_checked,
+                        });
                     }
                     embedded
                 };
@@ -947,9 +951,9 @@ impl Interpreter {
                     args.insert(0, Object::Instance(instance.clone_with_private()));
                     self.eval_call_expr(func.clone(), args, type_checked, line)?;
                 }
-                for (embed, assigned) in &Rc::clone(&rc_component).embeds {
+                for embed in &Rc::clone(&rc_component).embeds {
                     let mut args = Vec::new();
-                    for embed_field in assigned {
+                    for embed_field in &embed.assigned {
                         match embed_field {
                             EmbedField::ParentField(field) => {
                                 let arg = if let Some(field_val) =
@@ -968,8 +972,12 @@ impl Interpreter {
                             EmbedField::Expr(expr) => args.push(self.eval_expr(expr.clone())?),
                         }
                     }
-                    let embed_instance =
-                        self.eval_call_expr(Object::Component(embed.clone()), args, false, line)?;
+                    let embed_instance = self.eval_call_expr(
+                        Object::Component(embed.component.clone()),
+                        args,
+                        embed.type_checked,
+                        line,
+                    )?;
                     if let Object::Instance(inst) = embed_instance {
                         instance.embeds.push(inst);
                     } else {
@@ -1741,8 +1749,8 @@ mod tests {
                 name: Ident("Test2".to_owned()),
                 fields: Vec::new(),
                 methods: HashMap::new(),
-                embeds: vec![(
-                    Component {
+                embeds: vec![EmbedComponent {
+                    component: Component {
                         name: Ident("Test".to_owned()),
                         fields: Vec::new(),
                         methods: {
@@ -1766,8 +1774,9 @@ mod tests {
                         exports: Vec::new(),
                         visibility: Visibility::Private,
                     },
-                    Vec::new(),
-                )],
+                    assigned: Vec::new(),
+                    type_checked: false,
+                }],
                 exports: Vec::new(),
                 visibility: Visibility::Private,
             }),
@@ -1775,8 +1784,8 @@ mod tests {
                 name: Ident("Test2".to_owned()),
                 fields: vec![(Ident("field".to_owned()), TypeAnnotation::default())],
                 methods: HashMap::new(),
-                embeds: vec![(
-                    Component {
+                embeds: vec![EmbedComponent {
+                    component: Component {
                         name: Ident("Test".to_owned()),
                         fields: Vec::new(),
                         methods: {
@@ -1800,8 +1809,9 @@ mod tests {
                         exports: Vec::new(),
                         visibility: Visibility::Private,
                     },
-                    vec![EmbedField::Expr(Expr::Ident(Ident("field".to_owned()), 1))],
-                )],
+                    assigned: vec![EmbedField::Expr(Expr::Ident(Ident("field".to_owned()), 1))],
+                    type_checked: false,
+                }],
                 exports: Vec::new(),
                 visibility: Visibility::Private,
             }),
@@ -2399,5 +2409,26 @@ mod tests {
         let expecteds = [Object::Nil];
 
         test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn type_checked_embeds() {
+        let inputs = ["
+            decl Test {
+                fn $new(self, i: Int) {}
+            }
+            decl Test2 {
+                [Test]! { 3.3 }
+            }
+            Test2();
+        "];
+        let errs = [RuntimeError::WrongArgType {
+            name: "i".to_owned(),
+            expected: TypeAnnotation::from_iter([AstType::Int]),
+            got: AstType::Float,
+            line: 8,
+        }];
+
+        runtime_error_eval!(inputs, errs)
     }
 }

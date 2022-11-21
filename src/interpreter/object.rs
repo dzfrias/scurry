@@ -286,9 +286,16 @@ pub struct Component {
     pub name: Ident,
     pub fields: Vec<(Ident, TypeAnnotation)>,
     pub methods: HashMap<String, Object>,
-    pub embeds: Vec<(Component, Vec<EmbedField>)>,
+    pub embeds: Vec<EmbedComponent>,
     pub exports: Vec<String>,
     pub visibility: Visibility,
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct EmbedComponent {
+    pub component: Component,
+    pub assigned: Vec<EmbedField>,
+    pub type_checked: bool,
 }
 
 #[derive(Debug, PartialEq)]

@@ -587,6 +587,7 @@ impl fmt::Display for DeclarationStmt {
 pub struct Embed {
     pub name: Ident,
     pub assigned: Vec<EmbedField>,
+    pub type_checked: bool,
     pub line: usize,
 }
 
