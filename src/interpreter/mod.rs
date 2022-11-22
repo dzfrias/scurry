@@ -423,6 +423,12 @@ impl Interpreter {
                 line,
             }) => {
                 let left = self.eval_expr(*left)?;
+                // For short-circuit evaluation
+                if matches!(op, InfixOp::LogicalAnd | InfixOp::LogicalOr) {
+                    return self
+                        .eval_logical_and_or(op, left, *right)
+                        .expect("op should be logical and/or");
+                }
                 let right = self.eval_expr(*right)?;
                 self.eval_infix_expr(op, left, right, line)
             }
@@ -662,8 +668,6 @@ impl Interpreter {
         line: usize,
     ) -> EvalResult {
         match op {
-            InfixOp::LogicalAnd => Ok(Object::Bool(left && right)),
-            InfixOp::LogicalOr => Ok(Object::Bool(left || right)),
             InfixOp::Eq => Ok(Object::Bool(left == right)),
             InfixOp::NotEq => Ok(Object::Bool(left != right)),
             _ => Err(RuntimeError::InvalidBinaryOperand {
@@ -672,6 +676,37 @@ impl Interpreter {
                 right: Type::Bool,
                 line,
             }),
+        }
+    }
+
+    fn eval_logical_and_or(
+        &mut self,
+        op: InfixOp,
+        left: Object,
+        right: Expr,
+    ) -> Option<EvalResult> {
+        match op {
+            InfixOp::LogicalOr => {
+                if left.is_truthy() {
+                    Some(Ok(Object::Bool(true)))
+                } else {
+                    Some(
+                        self.eval_expr(right)
+                            .and_then(|obj| Ok(Object::Bool(obj.is_truthy()))),
+                    )
+                }
+            }
+            InfixOp::LogicalAnd => {
+                if !left.is_truthy() {
+                    Some(Ok(Object::Bool(false)))
+                } else {
+                    Some(
+                        self.eval_expr(right)
+                            .and_then(|obj| Ok(Object::Bool(obj.is_truthy()))),
+                    )
+                }
+            }
+            _ => None,
         }
     }
 
@@ -844,6 +879,49 @@ impl Interpreter {
                         .borrow_mut()
                         .set(iter_ident.0.clone(), Object::String(char.to_string()));
                     loop_control!(self, block.clone());
+                }
+                Ok(Object::AbsoluteNil)
+            }
+            Object::Instance(instance) => {
+                for (embed, embed_instance) in
+                    instance.component.embeds.iter().zip(instance.embeds.iter())
+                {
+                    if embed.component.name.0 == "Iterator" {
+                        let mut next = self.eval_call_expr(
+                            embed_instance
+                                .component
+                                .methods
+                                .get("next")
+                                .unwrap()
+                                .clone(),
+                            vec![Object::Instance(embed_instance.clone_with_private())],
+                            false,
+                            line,
+                        )?;
+                        loop {
+                            if let Object::Instance(ref next_obj) = next {
+                                if next_obj.component.name.0 == "StopIteration" {
+                                    return Ok(Object::AbsoluteNil);
+                                }
+                            }
+                            self.env
+                                .borrow_mut()
+                                .set(iter_ident.0.clone(), next.clone());
+                            loop_control!(self, block.clone());
+                            next = self.eval_call_expr(
+                                embed_instance
+                                    .component
+                                    .methods
+                                    .get("next")
+                                    // FIX: Wrong iterator type
+                                    .unwrap()
+                                    .clone(),
+                                vec![Object::Instance(embed_instance.clone_with_private())],
+                                false,
+                                line,
+                            )?;
+                        }
+                    }
                 }
                 Ok(Object::AbsoluteNil)
             }
@@ -1349,13 +1427,7 @@ mod tests {
 
     #[test]
     fn invalid_binary_operands() {
-        let inputs = [
-            "\"test\" + 1;",
-            "False - 3;",
-            "True && 3;",
-            "1 || 1;",
-            "1.1 && 1.1;",
-        ];
+        let inputs = ["\"test\" + 1;", "False - 3;"];
         let errs = [
             RuntimeError::InvalidBinaryOperand {
                 op: InfixOp::Plus,
@@ -1367,24 +1439,6 @@ mod tests {
                 op: InfixOp::Minus,
                 left: Type::Bool,
                 right: Type::Int,
-                line: 1,
-            },
-            RuntimeError::InvalidBinaryOperand {
-                op: InfixOp::LogicalAnd,
-                left: Type::Bool,
-                right: Type::Int,
-                line: 1,
-            },
-            RuntimeError::InvalidBinaryOperand {
-                op: InfixOp::LogicalOr,
-                left: Type::Int,
-                right: Type::Int,
-                line: 1,
-            },
-            RuntimeError::InvalidBinaryOperand {
-                op: InfixOp::LogicalAnd,
-                left: Type::Float,
-                right: Type::Float,
                 line: 1,
             },
         ];
@@ -2424,5 +2478,13 @@ mod tests {
         }];
 
         runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn short_circuit_evaluation() {
+        let inputs = ["0 == 0 || 1 / 0;", "0 != 0 && 1 / 0;"];
+        let expecteds = [Object::Bool(true), Object::Bool(false)];
+
+        test_eval!(inputs, expecteds)
     }
 }
