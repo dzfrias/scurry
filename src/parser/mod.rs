@@ -1,9 +1,10 @@
 use crate::ast::*;
 use crate::lexer::Token;
 use logos::{Lexer, Logos};
+use std::borrow::BorrowMut;
 use std::collections::HashSet;
-use std::fmt;
 use std::ops::Range;
+use std::{fmt, mem};
 use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -96,6 +97,13 @@ pub enum ParserError {
         expect_scope: ScopeType,
         pos: Position,
     },
+
+    #[error("invalid assigned field `{field}` of component `{component}` on {pos}")]
+    InvalidAssignedField {
+        field: String,
+        component: String,
+        pos: Position,
+    },
 }
 
 impl ParserError {
@@ -108,6 +116,7 @@ impl ParserError {
             Self::IllegalCharacter { pos } => pos,
             Self::UnteriminatedString { pos } => pos,
             Self::InvalidPrefixOperator { pos, .. } => pos,
+            Self::InvalidAssignedField { pos, .. } => pos,
         }
     }
 }
@@ -678,7 +687,8 @@ impl<'a> Parser<'a> {
             }
         };
         self.next_token();
-        let name = self.parse_ident()?;
+        // Mutable so mem::take can be called
+        let mut name = self.parse_ident()?;
 
         self.expect_peek(Token::Lbrace)?;
         self.next_token();
@@ -757,6 +767,26 @@ impl<'a> Parser<'a> {
                 }),
             }
             self.next_token();
+        }
+        for embed in &mut embeds {
+            for assigned in &mut embed.assigned {
+                let EmbedField::ParentField(field) = assigned.borrow_mut() else {
+                    continue;
+                };
+                if fields
+                    .iter()
+                    .map(|(ident, _)| &ident.0)
+                    .chain(methods.iter().map(|func| &func.name.0))
+                    .find(|field_name| &field_name == &&field)
+                    .is_none()
+                {
+                    self.errors.push(ParserError::InvalidAssignedField {
+                        field: mem::take(field),
+                        component: mem::take(&mut name.0),
+                        pos: self.position(),
+                    })
+                }
+            }
         }
         Some(DeclarationStmt {
             name,
@@ -2395,11 +2425,14 @@ mod tests {
 
     #[test]
     fn dot_field_syntax_in_field_assignment() {
-        let inputs = ["decl Test { [Test2] { .test } }"];
+        let inputs = ["decl Test { test [Test2] { .test } }"];
         let expecteds = [Stmt::Declaration(DeclarationStmt {
             name: Ident("Test".to_owned()),
             methods: Vec::new(),
-            fields: Vec::new(),
+            fields: vec![(
+                Ident("test".to_owned()),
+                TypeAnnotation::from_iter([AstType::Any]),
+            )],
             embeds: vec![Embed {
                 name: Ident("Test2".to_owned()),
                 assigned: vec![EmbedField::ParentField("test".to_owned())],
