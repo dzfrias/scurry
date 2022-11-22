@@ -34,9 +34,19 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self {
+        let mut interpreter = Self {
             env: Rc::new(RefCell::new(Env::new())),
+        };
+        let std = [include_str!("core/iterator.scy")];
+        for contents in std {
+            let program = Parser::new(contents)
+                .parse()
+                .expect("should not have parser errors in std");
+            interpreter
+                .eval(program)
+                .expect("should execute std with no errors");
         }
+        interpreter
     }
 
     pub fn eval(&mut self, program: Program) -> Result<(), RuntimeError> {
