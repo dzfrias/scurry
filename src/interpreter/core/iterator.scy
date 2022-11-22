@@ -12,9 +12,8 @@ decl Iterator {
     }
 
     exp fn map(self, func: Fn) > Iterator {
-        x = self.next_fn;
         new_fn = fn() {
-            next = x();
+            next = self.next();
             if next == StopIteration() {
                 return next;
             } else {
@@ -65,9 +64,8 @@ decl Iterator {
     }
 
     exp fn filter(self, predicate: Fn) > Iterator {
-        x = self.next_fn;
         new_fn = fn() {
-            next = x();
+            next = self.next();
             while next != StopIteration() && !predicate(next) {
                 next = x();
             }
@@ -94,11 +92,10 @@ decl Iterator {
     exp fn take(self, n: Int) {
         // Hacky way to share state with new_fn
         current = [n];
-        x = self.next_fn;
         new_fn = fn() {
             if current[0] != 0 {
                 current[0] -= 1;
-                return x();
+                return self.next();
             } else {
                 return StopIteration();
             }
@@ -122,6 +119,17 @@ decl Iterator {
         }
         return arr;
     }
+
+    exp fn chain(self, other: Iterator) > Iterator {
+        new_fn = fn() {
+            next = self.next();
+            if next == StopIteration() {
+                return other.next();
+            }
+            return next;
+        };
+        return Iterator(new_fn);
+    }
 }
 
 decl Range {
@@ -129,7 +137,7 @@ decl Range {
     end: Int
 
     [Iterator] {
-        .next
+        .next_
     }
 
     fn $new(self, start: Int, end: Int) {
@@ -137,7 +145,7 @@ decl Range {
         self.end = end;
     }
 
-    fn next(self) {
+    fn next_(self) {
         self.current += 1;
         if self.current >= self.end {
             return StopIteration();
