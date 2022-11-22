@@ -34,8 +34,8 @@ True
   - No `_` in numbers
 - `String` literals, only double quotes allowed
    - `"This is a string!"`
-- `True` for boolean true
-- `False` for boolean false
+- `True` for [boolean](./types/bool.md) true
+- `False` for [boolean](./types/bool.md) false
 - `Nil` for null
 - Brackets for `Array` literals. Arrays are dynamically sized
    - `[1, 2, 3, Nil]`
