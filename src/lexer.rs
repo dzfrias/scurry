@@ -1,5 +1,21 @@
-use logos::{self, Logos};
+use logos::{self, Lexer, Logos};
 use std::fmt;
+
+fn hex_to_decimal(lex: &mut Lexer<Token>) -> i32 {
+    let hex_str = lex
+        .slice()
+        .strip_prefix("0x")
+        .expect("should have leading 0x");
+    i32::from_str_radix(hex_str, 16).expect("should be valid hex number")
+}
+
+fn binary_to_decimal(lex: &mut Lexer<Token>) -> i32 {
+    let binary_str = lex
+        .slice()
+        .strip_prefix("0b")
+        .expect("should have leading 0b");
+    i32::from_str_radix(binary_str, 2).expect("should be valid binary number")
+}
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token {
@@ -8,6 +24,8 @@ pub enum Token {
     #[regex(r"[0-9]+\.[0-9]+", |lex| lex.slice().parse())]
     Float(f32),
     #[regex(r"[0-9]+", |lex| lex.slice().parse(), priority = 2)]
+    #[regex(r"0x[0-9a-fA-F]+", hex_to_decimal)]
+    #[regex(r"0b[0-1]+", binary_to_decimal)]
     Integer(i32),
     #[regex("\"(?s:[^\"\\\\]|\\\\.)*\"", |lex| lex.slice().strip_prefix('"').expect("Should have leading \"").strip_suffix('"').expect("Should have trailing \"").to_owned())]
     String(String),
