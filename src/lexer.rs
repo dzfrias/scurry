@@ -593,6 +593,24 @@ mod tests {
     }
 
     #[test]
+    fn lexes_binary_literals() {
+        let mut lexer = Token::lexer("0b1010");
+        assert_eq!(
+            Token::Integer(10),
+            lexer.next().expect("Should lex something")
+        );
+    }
+
+    #[test]
+    fn lexes_hexadecimal_literals() {
+        let mut lexer = Token::lexer("0xde3");
+        assert_eq!(
+            Token::Integer(3555),
+            lexer.next().expect("Should lex something")
+        );
+    }
+
+    #[test]
     fn recognizes_eof() {
         let mut lexer = Token::lexer("");
         assert_eq!(None, lexer.next());
