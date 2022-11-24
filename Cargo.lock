@@ -53,6 +53,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_complete"
+version = "4.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b7b3c9eae0de7bf8e3f904a5e40612b21fb2e2e566456d177809a48b892d24da"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "clap_derive"
 version = "4.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -411,6 +420,7 @@ name = "scurry"
 version = "0.3.0"
 dependencies = [
  "clap",
+ "clap_complete",
  "logos",
  "rustyline",
  "rustyline-derive",

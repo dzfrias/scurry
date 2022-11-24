@@ -1,8 +1,10 @@
-use clap::Parser as ArgParser;
+mod cli;
+
+use clap::{Parser as ArgParser, ValueHint};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::MatchingBracketHighlighter;
 use rustyline::validate::MatchingBracketValidator;
-use rustyline::{Config, Editor};
+use rustyline::{Cmd, ColorMode, Config, EditMode, Editor, KeyEvent};
 use rustyline_derive::{Completer, Helper, Highlighter, Hinter, Validator};
 use scurry;
 use scurry::interpreter::object::RuntimeError;
@@ -15,7 +17,13 @@ use std::process;
 #[derive(Debug, ArgParser)]
 #[command(author, version, about, long_about = None)]
 struct Args {
+    #[arg(conflicts_with_all = ["no_color", "vi_mode"], value_hint = ValueHint::FilePath)]
     file: Option<PathBuf>,
+
+    #[arg(long)]
+    no_color: bool,
+    #[arg(long)]
+    vi_mode: bool,
 }
 
 #[derive(Helper, Completer, Hinter, Highlighter, Validator)]
@@ -30,7 +38,7 @@ fn main() {
     let args = Args::parse();
     match args.file {
         Some(path) => eval_file(path),
-        None => start_repl(),
+        None => start_repl(args),
     }
 }
 
@@ -79,16 +87,30 @@ fn eval_file(path: PathBuf) {
     }
 }
 
-fn start_repl() {
+fn start_repl(args: Args) {
     const PROMPT: &str = ">> ";
 
     let helper = ReadlineHelper {
         highlighter: MatchingBracketHighlighter::new(),
         brackets: MatchingBracketValidator::new(),
     };
-    let config = Config::builder().indent_size(4).tab_stop(4).build();
+    let config = Config::builder()
+        .indent_size(4)
+        .tab_stop(4)
+        .color_mode(
+            args.no_color
+                .then_some(ColorMode::Disabled)
+                .unwrap_or(ColorMode::Enabled),
+        )
+        .edit_mode(
+            args.vi_mode
+                .then_some(EditMode::Vi)
+                .unwrap_or(EditMode::Emacs),
+        )
+        .build();
     let mut editor = Editor::with_config(config).expect("options should all work");
     editor.set_helper(Some(helper));
+    editor.bind_sequence(KeyEvent::from('\t'), Cmd::Insert(1, "    ".to_owned()));
     let mut interpreter = Interpreter::new();
     loop {
         let readline = editor.readline(PROMPT);
