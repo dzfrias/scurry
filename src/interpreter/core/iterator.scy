@@ -67,7 +67,7 @@ decl Iterator {
         new_fn = fn() {
             next = self.next();
             while next != StopIteration() && !predicate(next) {
-                next = x();
+                next = self.next();
             }
             return next;
         };
