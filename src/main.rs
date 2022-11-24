@@ -1,6 +1,9 @@
 use clap::Parser as ArgParser;
 use rustyline::error::ReadlineError;
+use rustyline::highlight::MatchingBracketHighlighter;
+use rustyline::validate::MatchingBracketValidator;
 use rustyline::{Config, Editor};
+use rustyline_derive::{Completer, Helper, Highlighter, Hinter, Validator};
 use scurry;
 use scurry::interpreter::object::RuntimeError;
 use scurry::interpreter::Interpreter;
@@ -13,6 +16,14 @@ use std::process;
 #[command(author, version, about, long_about = None)]
 struct Args {
     file: Option<PathBuf>,
+}
+
+#[derive(Helper, Completer, Hinter, Highlighter, Validator)]
+struct ReadlineHelper {
+    #[rustyline(Highlighter)]
+    highlighter: MatchingBracketHighlighter,
+    #[rustyline(Validator)]
+    brackets: MatchingBracketValidator,
 }
 
 fn main() {
@@ -71,8 +82,13 @@ fn eval_file(path: PathBuf) {
 fn start_repl() {
     const PROMPT: &str = ">> ";
 
+    let helper = ReadlineHelper {
+        highlighter: MatchingBracketHighlighter::new(),
+        brackets: MatchingBracketValidator::new(),
+    };
     let config = Config::builder().indent_size(4).tab_stop(4).build();
-    let mut editor = Editor::<()>::with_config(config).expect("options should all work");
+    let mut editor = Editor::with_config(config).expect("options should all work");
+    editor.set_helper(Some(helper));
     let mut interpreter = Interpreter::new();
     loop {
         let readline = editor.readline(PROMPT);
