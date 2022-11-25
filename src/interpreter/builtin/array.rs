@@ -103,7 +103,7 @@ pub fn concat(bound: Object, args: Vec<Object>, line: usize) -> Option<EvalResul
         return Some(Err(RuntimeError::WrongArgType { name: "array".to_owned(), expected: TypeAnnotation::from_iter([AstType::Array]), got: args[0].scurry_type().into(), line }));
     };
     if let Object::Array(obj) = bound {
-        let mut new_arr = <RefCell<Vec<Object>>>::clone(&arr).into_inner();
+        let mut new_arr = <RefCell<Vec<Object>>>::clone(arr).into_inner();
         obj.borrow_mut().append(&mut new_arr);
         Some(Ok(Object::Nil))
     } else {

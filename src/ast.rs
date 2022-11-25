@@ -346,7 +346,7 @@ impl fmt::Display for AssignStmt {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub enum AssignOp {
     Plus,
     Minus,
@@ -468,7 +468,7 @@ impl fmt::Display for FunctionStmt {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct ImportStmt {
     pub target: String,
     pub alias: Option<Ident>,
@@ -710,7 +710,7 @@ impl From<Ident> for AstType {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub struct TypeAnnotation(pub HashSet<AstType>);
 
 impl fmt::Display for TypeAnnotation {

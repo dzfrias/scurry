@@ -702,7 +702,7 @@ impl Interpreter {
                 } else {
                     Some(
                         self.eval_expr(right)
-                            .and_then(|obj| Ok(Object::Bool(obj.is_truthy()))),
+                            .map(|obj| Object::Bool(obj.is_truthy())),
                     )
                 }
             }
@@ -712,7 +712,7 @@ impl Interpreter {
                 } else {
                     Some(
                         self.eval_expr(right)
-                            .and_then(|obj| Ok(Object::Bool(obj.is_truthy()))),
+                            .map(|obj| Object::Bool(obj.is_truthy())),
                     )
                 }
             }
@@ -1253,6 +1253,12 @@ impl Interpreter {
             },
         );
         Ok(Object::AbsoluteNil)
+    }
+}
+
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

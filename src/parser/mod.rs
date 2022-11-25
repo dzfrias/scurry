@@ -773,12 +773,11 @@ impl<'a> Parser<'a> {
                 let EmbedField::ParentField(field) = assigned.borrow_mut() else {
                     continue;
                 };
-                if fields
+                if !fields
                     .iter()
                     .map(|(ident, _)| &ident.0)
                     .chain(methods.iter().map(|func| &func.name.0))
-                    .find(|field_name| &field_name == &&field)
-                    .is_none()
+                    .any(|field_name| field_name == field)
                 {
                     self.errors.push(ParserError::InvalidAssignedField {
                         field: mem::take(field),

@@ -241,6 +241,7 @@ pub enum Type {
     Module,
 }
 
+#[allow(clippy::from_over_into)]
 impl Into<AstType> for Type {
     fn into(self) -> AstType {
         match self {
@@ -360,7 +361,7 @@ impl Clone for Instance {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub enum ControlChange {
     Return(Box<Object>),
     Break,
