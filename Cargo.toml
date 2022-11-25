@@ -27,4 +27,4 @@ clap_complete = { version = "4.0.6" }
 clap_mangen = { version = "0.2.5" }
 
 [features]
-binaries = ["rustyline", "clap", "rustyline-derive"]
+default = ["rustyline", "clap", "rustyline-derive"]
