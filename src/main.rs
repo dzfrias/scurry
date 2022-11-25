@@ -1,6 +1,7 @@
-mod cli;
+pub mod cli;
 
-use clap::{Parser as ArgParser, ValueHint};
+use clap::Parser as ArgParser;
+use cli::Args;
 use rustyline::error::ReadlineError;
 use rustyline::highlight::MatchingBracketHighlighter;
 use rustyline::validate::MatchingBracketValidator;
@@ -13,18 +14,6 @@ use scurry::parser::Parser;
 use std::fs;
 use std::path::PathBuf;
 use std::process;
-
-#[derive(Debug, ArgParser)]
-#[command(author, version, about, long_about = None)]
-struct Args {
-    #[arg(conflicts_with_all = ["no_color", "vi_mode"], value_hint = ValueHint::FilePath)]
-    file: Option<PathBuf>,
-
-    #[arg(long)]
-    no_color: bool,
-    #[arg(long)]
-    vi_mode: bool,
-}
 
 #[derive(Helper, Completer, Hinter, Highlighter, Validator)]
 struct ReadlineHelper {

@@ -3,12 +3,12 @@ use std::path::PathBuf;
 
 #[derive(Debug, ArgParser)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+pub struct Args {
     #[arg(conflicts_with_all = ["no_color", "vi_mode"], value_hint = ValueHint::FilePath)]
-    file: Option<PathBuf>,
+    pub file: Option<PathBuf>,
 
     #[arg(long)]
-    no_color: bool,
+    pub no_color: bool,
     #[arg(long)]
-    vi_mode: bool,
+    pub vi_mode: bool,
 }
