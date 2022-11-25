@@ -19,7 +19,7 @@ macro_rules! validate_args_len {
 pub fn len(bound: Object, args: Vec<Object>, line: usize) -> Option<EvalResult> {
     validate_args_len!(args, 0, line);
     if let Object::String(obj) = bound {
-        Some(Ok(Object::Int(obj.len() as i32)))
+        Some(Ok(Object::Int(obj.chars().count() as i32)))
     } else {
         None
     }
