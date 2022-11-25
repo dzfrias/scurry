@@ -15,13 +15,16 @@ exclude = ["/website"]
 
 [dependencies]
 logos = "0.12.1"
-clap = { version = "4.0.13", features = ["derive"] }
-rustyline = "10.0.0"
 thiserror = "1.0.37"
-rustyline-derive = "0.7.0"
 snailquote = "0.3.1"
+clap = { version = "4.0.13", features = ["derive"], optional = true }
+rustyline = { version = "10.0.0", optional = true }
+rustyline-derive = { version = "0.7.0", optional = true }
 
 [build-dependencies]
 clap = { version = "4.0.13", features = ["derive"] }
-clap_complete = "4.0.6"
-clap_mangen = "0.2.5"
+clap_complete = { version = "4.0.6" }
+clap_mangen = { version = "0.2.5" }
+
+[features]
+binaries = ["rustyline", "clap", "rustyline-derive"]
