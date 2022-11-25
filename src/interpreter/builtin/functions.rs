@@ -18,7 +18,7 @@ pub fn println(args: Vec<Object>, _line: usize) -> EvalResult {
         args.into_iter()
             .map(|arg| {
                 if let Object::String(s) = arg {
-                    format!("\"{s}\" ")
+                    s + " "
                 } else {
                     arg.to_string() + " "
                 }

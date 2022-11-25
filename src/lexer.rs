@@ -1,4 +1,5 @@
 use logos::{self, Lexer, Logos};
+use snailquote;
 use std::fmt;
 
 fn hex_to_decimal(lex: &mut Lexer<Token>) -> i32 {
@@ -17,6 +18,10 @@ fn binary_to_decimal(lex: &mut Lexer<Token>) -> i32 {
     i32::from_str_radix(binary_str, 2).expect("should be valid binary number")
 }
 
+fn parse_string(lex: &mut Lexer<Token>) -> String {
+    snailquote::unescape(lex.slice()).unwrap()
+}
+
 #[derive(Logos, Debug, PartialEq, Clone)]
 pub enum Token {
     #[regex(r"[_A-Za-z][_A-Za-z0-9]*", |lex| lex.slice().to_owned(), priority = 2)]
@@ -27,7 +32,7 @@ pub enum Token {
     #[regex(r"0x[0-9a-fA-F]+", hex_to_decimal)]
     #[regex(r"0b[0-1]+", binary_to_decimal)]
     Integer(i32),
-    #[regex("\"(?s:[^\"\\\\]|\\\\.)*\"", |lex| lex.slice().strip_prefix('"').expect("Should have leading \"").strip_suffix('"').expect("Should have trailing \"").to_owned())]
+    #[regex("\"(?s:[^\"\\\\]|\\\\.)*\"", parse_string)]
     String(String),
     #[token("True")]
     True,
