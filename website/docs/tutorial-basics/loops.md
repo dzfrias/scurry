@@ -33,24 +33,21 @@ for i in Range(0, 3) {
 In this program, `0`, `1`, and `2` will be printed.
 
 ### Builtin Types
-<!--- TODO: Link here -->
-`Array`s can be looped through.
+[Arrays](./types/array) can be looped through.
 ```
 for item in [1, 2, 3] {
    println(item);
 }
 ```
 
-<!--- TODO: Link here -->
-`String`s can be looped through.
+[Strings](./types/string) can be looped through.
 ```
 for char in "Hello!" {
    println(char);
 }
 ```
-<!--- TODO: Link here -->
 Scurry does not have a dedicated `char` type, so the `char` variable in this
-example will be another `String`
+example will be another [String](./types/string)
 
 <!--- TODO: Link here -->
 `Map`s can be looped through.
