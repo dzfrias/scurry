@@ -49,8 +49,7 @@ for char in "Hello!" {
 Scurry does not have a dedicated `char` type, so the `char` variable in this
 example will be another [String](./types/string)
 
-<!--- TODO: Link here -->
-`Map`s can be looped through.
+[Maps](./types/map) can be looped through.
 ```
 for key in {"test": 0, 10: 0} {
    println(key);

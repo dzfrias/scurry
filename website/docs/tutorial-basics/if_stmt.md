@@ -51,10 +51,9 @@ This coercion **only** happens in `if` statements, and can be called explicitly
 with the `truthy` function. <!--- TODO: Put links here -->
 
 Here's a full list of what makes an something truthy or falsey:
-- [Int](./types/int.md): `False` when `0`
-- [Float](./types/float.md): `False` when `0.0`
-<!--- TODO: Put links here -->
-- `String`: `False` when empty
-- `Array`: `False` when empty
-- `Map`: `False` when empty
+- [Int](./types/int): `False` when `0`
+- [Float](./types/float): `False` when `0.0`
+- [String](./types/string): `False` when empty
+- [Array](./types/array): `False` when empty
+- [Map](./types/map): `False` when empty
 - Everything else is always `False`

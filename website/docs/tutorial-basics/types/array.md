@@ -6,6 +6,7 @@ sidebar_position: 5
 The builtin `Array` type in Scurry.
 
 ## Behavior
+- Dynamically sized
 - Can hold items of any type
   ```
   >> [1, 3.3, "string", Nil];
