@@ -1076,7 +1076,11 @@ impl<'a, T: Write> Interpreter<'a, T> {
             Object::Builtin(func) => func(args, line),
             Object::Println => {
                 for arg in args {
-                    writeln!(self.out, "{arg}").unwrap()
+                    if let Object::String(s) = arg {
+                        writeln!(self.out, "{s} ").unwrap()
+                    } else {
+                        writeln!(self.out, "{arg} ").unwrap()
+                    }
                 }
                 Ok(Object::Nil)
             }
