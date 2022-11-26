@@ -12,22 +12,6 @@ macro_rules! validate_args_len {
     };
 }
 
-pub fn println(args: Vec<Object>, _line: usize) -> EvalResult {
-    println!(
-        "{}",
-        args.into_iter()
-            .map(|arg| {
-                if let Object::String(s) = arg {
-                    s + " "
-                } else {
-                    arg.to_string() + " "
-                }
-            })
-            .collect::<String>()
-    );
-    Ok(Object::Nil)
-}
-
 pub fn scurry_type(args: Vec<Object>, line: usize) -> EvalResult {
     validate_args_len!(args, 1, line);
     Ok(Object::String(args[0].scurry_type().to_string()))

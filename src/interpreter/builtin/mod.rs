@@ -9,7 +9,6 @@ use super::object::*;
 
 pub fn get_builtin_func(name: &str) -> Option<BuiltinFunc> {
     match name {
-        "println" => Some(functions::println),
         "type" => Some(functions::scurry_type),
         "truthy" => Some(functions::truthy),
         _ => None,

@@ -11,9 +11,9 @@ use scurry;
 use scurry::interpreter::object::RuntimeError;
 use scurry::interpreter::Interpreter;
 use scurry::parser::Parser;
-use std::fs;
 use std::path::PathBuf;
 use std::process;
+use std::{fs, io};
 
 #[derive(Helper, Completer, Hinter, Highlighter, Validator)]
 struct ReadlineHelper {
@@ -39,7 +39,8 @@ fn eval_file(path: PathBuf) {
             process::exit(1);
         }
     };
-    let mut interpreter = Interpreter::new();
+    let stdout = &mut io::stdout();
+    let mut interpreter = Interpreter::new(stdout);
     let parser = Parser::new(
         &contents
             .strip_suffix('\n')
@@ -100,7 +101,8 @@ fn start_repl(args: Args) {
     let mut editor = Editor::with_config(config).expect("options should all work");
     editor.set_helper(Some(helper));
     editor.bind_sequence(KeyEvent::from('\t'), Cmd::Insert(1, "    ".to_owned()));
-    let mut interpreter = Interpreter::new();
+    let stdout = &mut io::stdout();
+    let mut interpreter = Interpreter::new(stdout);
     loop {
         let readline = editor.readline(PROMPT);
         match readline {

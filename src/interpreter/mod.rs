@@ -8,9 +8,11 @@ use crate::ast::*;
 use crate::parser::Parser;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::fs;
+use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
+#[allow(unused_imports)]
+use std::{fs, io};
 
 macro_rules! loop_control {
     ($interpreter:expr, $block:expr) => {{
@@ -27,14 +29,15 @@ macro_rules! loop_control {
     }};
 }
 
-#[derive(Debug)]
-pub struct Interpreter {
+pub struct Interpreter<'a, T> {
+    out: &'a mut T,
     env: Rc<RefCell<Env>>,
 }
 
-impl Interpreter {
-    pub fn new() -> Self {
+impl<'a, T: Write> Interpreter<'a, T> {
+    pub fn new(out: &'a mut T) -> Self {
         let mut interpreter = Self {
+            out,
             env: Rc::new(RefCell::new(Env::new())),
         };
         let std = [include_str!("core/iterator.scy")];
@@ -449,6 +452,8 @@ impl Interpreter {
         let val = self.env.borrow().get(name);
         if let Some(val) = val {
             Ok(val)
+        } else if name == "println" {
+            Ok(Object::Println)
         } else if let Some(func) = builtin::get_builtin_func(name) {
             Ok(Object::Builtin(func))
         } else {
@@ -1069,6 +1074,12 @@ impl Interpreter {
                 Ok(Object::Instance(instance))
             }
             Object::Builtin(func) => func(args, line),
+            Object::Println => {
+                for arg in args {
+                    writeln!(self.out, "{arg}").unwrap()
+                }
+                Ok(Object::Nil)
+            }
             Object::BuiltinMethod { bound, function } => {
                 function(*bound, args, line).expect("bound type should match")
             }
@@ -1236,7 +1247,7 @@ impl Interpreter {
             contents,
             errs: err,
         })?;
-        let mut module_interpreter = Interpreter::new();
+        let mut module_interpreter = Interpreter::new(self.out);
         module_interpreter.eval(program)?;
         let name = {
             if let Some(alias) = alias {
@@ -1256,12 +1267,6 @@ impl Interpreter {
     }
 }
 
-impl Default for Interpreter {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::{fs::File, io::Write};
@@ -1274,7 +1279,8 @@ mod tests {
             for (input, expected) in $inputs.iter().zip($expecteds) {
                 let parser = Parser::new(input);
                 let program = parser.parse().expect("Should have no parser errors");
-                let mut interpreter = Interpreter::new();
+                let stdout = &mut io::stdout();
+                let mut interpreter = Interpreter::new(stdout);
                 assert_eq!(
                     expected,
                     interpreter
@@ -1290,7 +1296,8 @@ mod tests {
             for (input, err) in $inputs.iter().zip($errs) {
                 let parser = Parser::new(input);
                 let program = parser.parse().expect("Should have no parser errors");
-                let mut interpreter = Interpreter::new();
+                let stdout = &mut io::stdout();
+                let mut interpreter = Interpreter::new(stdout);
                 assert_eq!(
                     err,
                     interpreter
@@ -2502,5 +2509,20 @@ mod tests {
         let expecteds = [Object::Bool(true), Object::Bool(false)];
 
         test_eval!(inputs, expecteds)
+    }
+
+    #[test]
+    fn println_writes() {
+        let input = "println(3);";
+        let expected = "3\n";
+
+        let parser = Parser::new(input);
+        let program = parser.parse().expect("Should have no parser errors");
+        let mut out = Vec::new();
+        let mut interpreter = Interpreter::new(&mut out);
+        interpreter
+            .eval(program)
+            .expect("should evaluate with no errors");
+        assert_eq!(expected, String::from_utf8(out).unwrap())
     }
 }

@@ -41,6 +41,7 @@ pub enum Object {
         visibility: Option<Visibility>,
     },
     Builtin(BuiltinFunc),
+    Println,
     BuiltinMethod {
         bound: Box<Object>,
         function: BuiltinMethod,
@@ -78,6 +79,7 @@ impl Clone for Object {
                 visibility: visibility.clone(),
             },
             Self::Builtin(builtin) => Self::Builtin(*builtin),
+            Self::Println => Self::Println,
             Self::BuiltinMethod { bound, function } => Self::BuiltinMethod {
                 bound: bound.clone(),
                 function: *function,
@@ -119,6 +121,7 @@ impl Object {
             Self::Int(_) => Type::Int,
             Self::Function { .. } => Type::Function,
             Self::Builtin(_) => Type::Builtin,
+            Self::Println => Type::Builtin,
             Self::BuiltinMethod { .. } => Type::Builtin,
             Self::Float(_) => Type::Float,
             Self::Bool(_) => Type::Bool,
@@ -144,6 +147,7 @@ impl Object {
             Self::Map(map) => !map.borrow().is_empty(),
             Self::Function { .. } => false,
             Self::Builtin(_) => false,
+            Self::Println => false,
             Self::BuiltinMethod { .. } => false,
             Self::Module { .. } => false,
             Self::ControlChange(_) => false,
@@ -208,7 +212,9 @@ impl fmt::Display for Object {
                     params.strip_suffix(", ").unwrap_or_default()
                 )
             }
-            Self::Builtin(_) | Self::BuiltinMethod { .. } => write!(f, "<builtin>"),
+            Self::Builtin(_) | Self::BuiltinMethod { .. } | Self::Println => {
+                write!(f, "<builtin>")
+            }
 
             Self::Instance(Instance { component, .. }) => {
                 let name = &component.name;
