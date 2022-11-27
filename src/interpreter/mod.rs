@@ -1075,13 +1075,22 @@ impl<'a, T: Write> Interpreter<'a, T> {
             }
             Object::Builtin(func) => func(args, line),
             Object::Println => {
-                for arg in args {
-                    if let Object::String(s) = arg {
-                        writeln!(self.out, "{s} ").unwrap()
-                    } else {
-                        writeln!(self.out, "{arg} ").unwrap()
-                    }
-                }
+                writeln!(
+                    self.out,
+                    "{}",
+                    args.into_iter()
+                        .map(|arg| {
+                            if let Object::String(s) = arg {
+                                s + " "
+                            } else {
+                                arg.to_string() + " "
+                            }
+                        })
+                        .collect::<String>()
+                        .strip_suffix(" ")
+                        .unwrap_or_default()
+                )
+                .unwrap();
                 Ok(Object::Nil)
             }
             Object::BuiltinMethod { bound, function } => {
