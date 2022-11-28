@@ -600,7 +600,18 @@ impl<'a, T: Write> Interpreter<'a, T> {
             InfixOp::Plus => check_overflow!(checked_add),
             InfixOp::Minus => check_overflow!(checked_sub),
             InfixOp::Asterisk => check_overflow!(checked_mul),
-            InfixOp::Slash => check_zero_div!(checked_div),
+            InfixOp::Slash => {
+                if y == 0 {
+                    Err(RuntimeError::DivisionByZero {
+                        op: InfixOp::Slash,
+                        left: Number::Int(x),
+                        right: Number::Int(y),
+                        line,
+                    })
+                } else {
+                    Ok(Object::Float(x as f32 / y as f32))
+                }
+            }
             InfixOp::Modulo => check_zero_div!(checked_rem),
             InfixOp::Eq => Ok(Object::Bool(x == y)),
             InfixOp::NotEq => Ok(Object::Bool(x != y)),
