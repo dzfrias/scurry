@@ -1403,13 +1403,13 @@ mod tests {
     fn eval_integer_binary_ops() {
         let inputs = [
             "1 + 1;", "2 - 2;", "3 * 3;", "4 / 4;", "20 % 2;", "3 == 3;", "4 != 4;", "10 > 3;",
-            "6 < 0;", "30 >= 9;", "7 <= 7;",
+            "6 < 0;", "30 >= 9;", "7 <= 7;", "9 / 4;",
         ];
         let expecteds = [
             Object::Int(2),
             Object::Int(0),
             Object::Int(9),
-            Object::Int(1),
+            Object::Float(1.0),
             Object::Int(0),
             Object::Bool(true),
             Object::Bool(false),
@@ -1417,6 +1417,7 @@ mod tests {
             Object::Bool(false),
             Object::Bool(true),
             Object::Bool(true),
+            Object::Float(2.25),
         ];
 
         test_eval!(inputs, expecteds)
@@ -2273,7 +2274,7 @@ mod tests {
             Object::Int(1),
             Object::Int(-1),
             Object::Int(4),
-            Object::Int(1),
+            Object::Float(1.0),
             Object::Int(0),
         ];
 
@@ -2548,5 +2549,26 @@ mod tests {
             .eval(program)
             .expect("should evaluate with no errors");
         assert_eq!(expected, String::from_utf8(out).unwrap())
+    }
+
+    #[test]
+    fn div_by_zero_causes_runtime_error() {
+        let inputs = ["9 / 0;", "9 % 0;"];
+        let errs = [
+            RuntimeError::DivisionByZero {
+                op: InfixOp::Slash,
+                left: Number::Int(9),
+                right: Number::Int(0),
+                line: 1,
+            },
+            RuntimeError::DivisionByZero {
+                op: InfixOp::Modulo,
+                left: Number::Int(9),
+                right: Number::Int(0),
+                line: 1,
+            },
+        ];
+
+        runtime_error_eval!(inputs, errs)
     }
 }
