@@ -6,6 +6,10 @@ sidebar_position: 1
 
 A quick overview of the Scurry language.
 
+Note that this documentation website is **not** meant for people who are new to 
+programming language. It assumes that *some* prior experience with coding is
+present.
+
 ## Installation
 
 Scurry can currently be installed in **two** ways. More installation methods might
@@ -54,7 +58,7 @@ and a more nuanced look into components.
 - Syntax
 - Scurry's builtin types
 - Basic components
-- Best practices
+- Style
 
 ### Builtins
 The builtin features docs include:
