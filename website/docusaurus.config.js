@@ -90,6 +90,10 @@ const config = {
             title: 'More',
             items: [
               {
+                label: 'Website',
+                href: 'https://dzfrias.github.io/scurry-web/',
+              },
+              {
                 label: 'GitHub',
                 href: 'https://github.com/dzfrias/scurry',
               },
