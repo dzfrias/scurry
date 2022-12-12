@@ -8,16 +8,15 @@ const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 const config = {
   title: 'Scurry',
   tagline: 'An New Take on Object-Oriented Languages',
-  url: 'https://your-docusaurus-test-site.com',
+  url: 'https://dzfrias.github.io',
+  trailingSlash: false,
   baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
-  favicon: 'img/favicon.ico',
+  favicon: '/img/favicon.ico',
 
-  // GitHub pages deployment config.
-  // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'dzfrias', // Usually your GitHub org/user name.
-  projectName: 'scurry', // Usually your repo name.
+  organizationName: 'dzfrias',
+  projectName: 'scurry',
 
   // Even if you don't use internalization, you can use this field to set useful
   // metadata like html lang. For example, if your site is Chinese, you may want
