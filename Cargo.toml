@@ -11,7 +11,8 @@ keywords = ["cli", "language", "compiler"]
 categories = ["compilers"]
 rust-version = "1.65.0"
 edition = "2021"
-exclude = ["/website"]
+
+exclude = ["/website", "/examples"]
 
 [dependencies]
 logos = "0.12.1"

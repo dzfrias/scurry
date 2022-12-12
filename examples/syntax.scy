@@ -1,0 +1,44 @@
+// Basic arithmetic and variable assignment
+add = 1 + 1 + 1 + 1 - 1 * 3;
+
+if True {
+    println("True");
+} elif 3 != 3 || 5 >= 10 {
+    println("This makes no sense!!");
+} else {
+    println("False");
+}
+
+// Control flow
+for i in [1, 2, 3.3] {  // Dynamically sized arrays
+    println(i);
+}
+
+x = 0;
+while x != 3 {
+    println("x is not 3!");
+    x += 1;
+}
+
+switch 3 * 3 {
+    case 5 {
+        println("Why would this be true");
+    }
+
+    default {
+        println("The last resort");
+    }
+}
+
+// First class functions with lexical scoping
+fn this_cool_function(x) {
+    return fn() { return x; };
+}
+println(this_cool_function(3)());
+
+// Data structures
+array = [1, 2, 3];
+array.push("cool!");
+
+map = {"key": 4, 99: True};
+map[42] = "value";
