@@ -10,7 +10,7 @@ const config = {
   tagline: 'An New Take on Object-Oriented Languages',
   url: 'https://dzfrias.github.io',
   trailingSlash: false,
-  baseUrl: '/',
+  baseUrl: '/scurry/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: '/img/favicon.ico',
