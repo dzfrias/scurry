@@ -60,7 +60,6 @@ const config = {
             position: 'left',
             label: 'Documentation',
           },
-          {to: '/blog', label: 'Blog', position: 'left'},
           {
             href: 'https://crates.io/crates/scurry',
             label: 'crates.io',
