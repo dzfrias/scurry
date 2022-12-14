@@ -4,22 +4,19 @@
 const lightCodeTheme = require('prism-react-renderer/themes/github');
 const darkCodeTheme = require('prism-react-renderer/themes/dracula');
 
-const organizationName = 'dzfrias';
-const projectName = 'scurry';
-
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Scurry',
   tagline: 'An New Take on Object-Oriented Languages',
-  url: `https://${organizationName}.github.io`,
+  url: 'https://dzfrias.github.io',
   trailingSlash: false,
-  baseUrl: '`/${projectName}/`',
+  baseUrl: '/',
   onBrokenLinks: 'throw',
   onBrokenMarkdownLinks: 'warn',
   favicon: '/img/favicon.ico',
 
-  organizationName,
-  projectName,
+  organizationName: 'dzfrias',
+  projectName: 'scurry',
 
   // Even if you don't use internalization, you can use this field to set useful
   // metadata like html lang. For example, if your site is Chinese, you may want
