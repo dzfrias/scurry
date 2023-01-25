@@ -1,6 +1,6 @@
 [package]
 name = "scurry"
-version = "0.4.3"
+version = "0.5.0"
 authors = ["Diego Frias <styx5242@gmail.com>"]
 license = "MIT"
 description = "A component-based object-oriented language"
