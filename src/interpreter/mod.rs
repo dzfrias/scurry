@@ -398,6 +398,10 @@ impl<'a, T: Write> Interpreter<'a, T> {
                 let index = self.eval_expr(*index)?;
                 self.eval_index_expr(expr, index, line)
             }
+            Expr::Unbound(UnboundExpr { ident, value }) => {
+                let expr = self.eval_expr(*value)?;
+                Ok(self.eval_unbound_expr(ident, expr))
+            }
             Expr::Function(FunctionExpr { params, block, .. }) => Ok(Object::Function {
                 params,
                 body: block,
@@ -1288,6 +1292,14 @@ impl<'a, T: Write> Interpreter<'a, T> {
             },
         );
         Ok(Object::AbsoluteNil)
+    }
+
+    fn eval_unbound_expr(&mut self, ident: Ident, val: Object) -> Object {
+        if let Some(var) = self.env.borrow().get(&ident.0) {
+            return var;
+        }
+        self.env.borrow_mut().set(ident.0, val.clone());
+        val
     }
 }
 
@@ -2570,5 +2582,21 @@ mod tests {
         ];
 
         runtime_error_eval!(inputs, errs)
+    }
+
+    #[test]
+    fn unbound_returns_and_assigns_when_var_unbound() {
+        let inputs = ["x ? 3;", "x ? 3; x;"];
+        let expecteds = [Object::Int(3), Object::Int(3)];
+
+        test_eval!(inputs, expecteds);
+    }
+
+    #[test]
+    fn unbound_returns_var_when_var_is_assigned() {
+        let inputs = ["x = 55; x ? 3;"];
+        let expecteds = [Object::Int(55)];
+
+        test_eval!(inputs, expecteds);
     }
 }

@@ -130,6 +130,7 @@ enum Precedence {
     LessGreater,
     Sum,
     Product,
+    Unbound,
     Prefix,
     Call,
     IndexDot,
@@ -146,6 +147,7 @@ impl From<&Token> for Precedence {
             Token::Slash | Token::Asterisk | Token::Percent => Precedence::Product,
             Token::Lparen => Precedence::Call,
             Token::Lbracket | Token::Dot => Precedence::IndexDot,
+            Token::QuestionMark => Precedence::Unbound,
             _ => Precedence::Lowest,
         }
     }
@@ -404,6 +406,18 @@ impl<'a> Parser<'a> {
                 Token::Lbracket => {
                     self.next_token();
                     Expr::Index(self.parse_index_expr(left_exp)?)
+                }
+                Token::QuestionMark => {
+                    self.next_token();
+                    self.next_token();
+                    let Expr::Ident(ident, _) = left_exp else {
+                        return None;
+                    };
+                    let value = self.parse_expr(Precedence::Lowest)?;
+                    Expr::Unbound(UnboundExpr {
+                        ident,
+                        value: Box::new(value),
+                    })
                 }
                 Token::Dot => {
                     self.next_token();
@@ -2461,5 +2475,27 @@ mod tests {
         })];
 
         test_parse!(inputs, expecteds)
+    }
+
+    #[test]
+    fn parse_unbound_expr() {
+        let inputs = ["x ? 3;", "1 + x ? 3;"];
+        let expecteds = [
+            Stmt::Expr(Expr::Unbound(UnboundExpr {
+                ident: Ident("x".to_owned()),
+                value: Box::new(Expr::Literal(Literal::Integer(3))),
+            })),
+            Stmt::Expr(Expr::Infix(InfixExpr {
+                left: Box::new(Expr::Literal(Literal::Integer(1))),
+                op: InfixOp::Plus,
+                right: Box::new(Expr::Unbound(UnboundExpr {
+                    ident: Ident("x".to_owned()),
+                    value: Box::new(Expr::Literal(Literal::Integer(3))),
+                })),
+                line: 1,
+            })),
+        ];
+
+        test_parse!(inputs, expecteds);
     }
 }

@@ -12,6 +12,7 @@ pub enum Expr {
     Function(FunctionExpr),
     Call(CallExpr),
     Index(IndexExpr),
+    Unbound(UnboundExpr),
 }
 
 impl fmt::Display for Expr {
@@ -25,6 +26,7 @@ impl fmt::Display for Expr {
             Self::Dot(dotexpr) => write!(f, "{dotexpr}"),
             Self::Index(indexexpr) => write!(f, "{indexexpr}"),
             Self::Call(call) => write!(f, "{call}"),
+            Self::Unbound(unbound) => write!(f, "{unbound}"),
         }
     }
 }
@@ -128,6 +130,18 @@ pub struct IndexExpr {
 impl fmt::Display for IndexExpr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}[{}]", self.left, self.index)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UnboundExpr {
+    pub ident: Ident,
+    pub value: Box<Expr>,
+}
+
+impl fmt::Display for UnboundExpr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{} ? {}", self.ident, self.value)
     }
 }
 
@@ -1209,5 +1223,16 @@ mod tests {
         ];
 
         test_to_string!(inputs, expecteds)
+    }
+
+    #[test]
+    fn unbound_expr_display() {
+        let inputs = [UnboundExpr {
+            ident: Ident("x".to_owned()),
+            value: Box::new(Expr::Literal(Literal::Integer(3))),
+        }];
+        let expecteds = ["x ? 3"];
+
+        test_to_string!(inputs, expecteds);
     }
 }

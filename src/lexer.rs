@@ -63,6 +63,8 @@ pub enum Token {
     Dollar,
     #[token("^")]
     Caret,
+    #[token("?")]
+    QuestionMark,
 
     #[token("<")]
     Lt,
@@ -187,6 +189,7 @@ impl fmt::Display for Token {
             Token::Lt => write!(f, "<"),
             Token::Dollar => write!(f, "$"),
             Token::Caret => write!(f, "^"),
+            Token::QuestionMark => write!(f, "?"),
             Token::Export => write!(f, "exp"),
             Token::Import => write!(f, "import"),
             Token::As => write!(f, "as"),
