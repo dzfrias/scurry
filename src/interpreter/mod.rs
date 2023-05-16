@@ -913,45 +913,51 @@ impl<'a, T: Write> Interpreter<'a, T> {
                 Ok(Object::AbsoluteNil)
             }
             Object::Instance(instance) => {
-                for (embed, embed_instance) in
-                    instance.component.embeds.iter().zip(instance.embeds.iter())
-                {
-                    if embed.component.name.0 == "Iterator" {
-                        let mut next = self.eval_call_expr(
-                            embed_instance
-                                .component
-                                .methods
-                                .get("next")
-                                .unwrap()
-                                .clone(),
-                            vec![Object::Instance(embed_instance.clone_with_private())],
-                            false,
-                            line,
-                        )?;
-                        loop {
-                            if let Object::Instance(ref next_obj) = next {
-                                if next_obj.component.name.0 == "StopIteration" {
-                                    return Ok(Object::AbsoluteNil);
-                                }
-                            }
-                            self.env
-                                .borrow_mut()
-                                .set(iter_ident.0.clone(), next.clone());
-                            loop_control!(self, block.clone());
-                            next = self.eval_call_expr(
-                                embed_instance
-                                    .component
-                                    .methods
-                                    .get("next")
-                                    // FIX: Wrong iterator type
-                                    .unwrap()
-                                    .clone(),
-                                vec![Object::Instance(embed_instance.clone_with_private())],
+                macro_rules! loop_through {
+                    ($instance:expr) => {
+                        if $instance.component.name.0 == "Iterator" {
+                            let mut next = self.eval_call_expr(
+                                $instance.component.methods.get("next").unwrap().clone(),
+                                vec![Object::Instance($instance.clone_with_private())],
                                 false,
                                 line,
                             )?;
+                            loop {
+                                if let Object::Instance(ref next_obj) = next {
+                                    if next_obj.component.name.0 == "StopIteration" {
+                                        return Ok(Object::AbsoluteNil);
+                                    }
+                                }
+                                self.env
+                                    .borrow_mut()
+                                    .set(iter_ident.0.clone(), next.clone());
+                                loop_control!(self, block.clone());
+                                next = self.eval_call_expr(
+                                    $instance
+                                        .component
+                                        .methods
+                                        .get("next")
+                                        // FIX: Wrong iterator type
+                                        .unwrap()
+                                        .clone(),
+                                    vec![Object::Instance($instance.clone_with_private())],
+                                    false,
+                                    line,
+                                )?;
+                            }
+                            true
+                        } else {
+                            false
                         }
-                    }
+                    };
+                }
+                // Loop through if instance is an Iterator and return early
+                if loop_through!(instance) {
+                    return Ok(Object::AbsoluteNil);
+                }
+                for embed_instance in instance.embeds.iter() {
+                    // Loop through if instance has an Iterator component
+                    loop_through!(embed_instance);
                 }
                 Ok(Object::AbsoluteNil)
             }

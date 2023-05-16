@@ -137,7 +137,7 @@ decl Range {
     end: Int
 
     [Iterator] {
-        .next_
+        .next
     }
 
     fn $new(self, start: Int, end: Int) {
@@ -145,7 +145,7 @@ decl Range {
         self.end = end;
     }
 
-    fn next_(self) {
+    fn next(self) {
         self.current += 1;
         if self.current >= self.end {
             return StopIteration();
